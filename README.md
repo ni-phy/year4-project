@@ -1,4 +1,4 @@
 # year4-project
-This is the GitHub repository for the year 4 project for the MSci Physcis degree at the University of Birmingham. 
+This is the GitHub repository for the 4th year project of the MSci Physcis degree at the University of Birmingham. 
 
-The project is by Henry Shaw and Nikolas Hadjiantoni, supervised by Dr Guy Davis.
+The project participants are Henry Shaw and Nikolas Hadjiantoni, the project is supervised by Dr Guy Davies.
