@@ -5,7 +5,8 @@ from sklearn import gaussian_process as gp
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
 
 #Attemt to model noisy sinusoidal wave with GP
-#Attempt1: using only Numpy
+#Attempt1: using only Numpy, 
+#Parts of the code were taken and somewhat altered by blog.dominodatalab.com/fitting-gaussian-process-models-python/
 def exponential_cov(x, y, params):
   return params[0] * np.exp( -10 * params[1] * np.subtract.outer(x, y)**2)
 
@@ -22,17 +23,13 @@ def conditional(x_new, x, y, params):
 def sinusoid(x):
   return np.sin( np.pi * x)
 
-def generate_1d_data(num_training_points, observation_noise_variance):
+def generate_1d_data(x, num_training_points, observation_noise_variance):
   """Generate noisy sinusoidal observations at a random set of points.
 
   Returns:
      observation_index_points, observations
   """
-  index_points_=np.linspace(0,2, num=num_training_points)
-  #index_points_ = np.random.uniform(-1., 1., (num_training_points, 1))
-  index_points_ = index_points_.astype(np.float64)
-  # y = f(x) + noise
-  observations_ = (sinusoid(index_points_) +
+  observations_ = (sinusoid(x) +
                    np.random.normal(loc=0,
                                     scale=np.sqrt(observation_noise_variance),
                                     size=(num_training_points)))
@@ -41,7 +38,8 @@ def generate_1d_data(num_training_points, observation_noise_variance):
 # Generate training data with a known noise level (we'll later try to recover
 # this value from the data).
 NUM_TRAINING_POINTS = 100
-observations_ = generate_1d_data(
+x = np.linspace(0, 2, num=NUM_TRAINING_POINTS)
+observations_ = generate_1d_data(x,
     num_training_points=NUM_TRAINING_POINTS, observation_noise_variance=.01)
 
 
@@ -58,7 +56,6 @@ def predict(x, data, kernel, params, sigma, t):
  
 x_pred = np.linspace(2, 4, 100)
 
-x = np.linspace(0, 2, num=NUM_TRAINING_POINTS)
 #observations_ = sinusoid(x)
 #mu, s = conditional(x_more, x, y, theta)
 y = observations_#np.random.multivariate_normal(mu, s)#np.array(observations_)#np.exp(np.linspace(0, 1, num=5))#np.random.multivariate_normal(mu, s)
@@ -66,7 +63,7 @@ y = observations_#np.random.multivariate_normal(mu, s)#np.array(observations_)#n
 σ_new = exponential_cov(x, x, theta)
 predictions = [predict(i, x_pred, exponential_cov, theta, σ_new, y) for i in x_pred]
 
-
+#The uncertainties are too small (of the order of e-16)
 y_pred, sigmas = np.transpose(predictions)
 print(sigmas)
 plt.plot(np.linspace(0,4), sinusoid(np.linspace(0,4)))
