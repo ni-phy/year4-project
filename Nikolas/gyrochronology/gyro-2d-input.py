@@ -10,58 +10,44 @@ Original file is located at
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import gpflow
 import tensorflow as tf
 import tensorflow_probability as tfp
+import gpflow
 from gpflow.utilities import print_summary, set_trainable, to_default_float
 from mpl_toolkits.mplot3d import Axes3D
 
+data = np.array(pd.read_csv('gyro_fake_data_v1.csv'))
 
-data = np.array(pd.read_csv(['gyro_fake_data_v1.csv']))
+Y = Y_plot = data[:100,1].reshape(-1,1)
+X1 = X1_plot = data[:100,2]
+X2 = X2_plot = data[:100,3]
 
-Y = Y_plot = data[:100,1].reshape(-1,1) #=age(GYr)
-X1 = X1_plot = data[:100,3]#.reshape(-1,1) #=rotation period (days)
-#X1 = X1.ravel()
-X2 = X2_plot = data[:100,3]#.reshape(-1,1)#this is b-v
-#X2 = X2.ravel()
+#np.random.seed(1991)
+meanf = gpflow.mean_functions.Constant(c=1.5)
+k = gpflow.kernels.Matern12(variance=10.0, lengthscales=[0.2, 10])
+X = np.dstack([X1, X2]).reshape(-1, 2)
+m = gpflow.models.GPR(data=(X, Y), kernel=k, mean_function=meanf)
 
-np.random.seed(1991)
-k = gpflow.kernels.Matern32(lengthscales=15.0)#(2,active_dims=[0,1], lengthscales=1.0)#k = gpflow.kernels.Matern32()*gpflow.kernels.Linear()
 x1_mesh, x2_mesh = np.meshgrid(X1, X2)
-X = np.dstack([x1_mesh, x2_mesh]).reshape(-1, 2)
-y1_mesh, y2_mesh = np.meshgrid(Y, Y)
-Y = np.dstack([y1_mesh, y2_mesh]).reshape(-1, 2)
-m = gpflow.models.GPR(data=(X, Y), kernel=k, mean_function=None)
 
-# optimise hyper-parameters
-opt = gpflow.optimizers.XiSqrtMeanVar()
+resolution = 50
+X1_test = np.linspace( 0.4, 1.5, num=resolution )
+X2_test = np.linspace( 1.0, 40.0, num=resolution )
+X1_test, X2_test = np.meshgrid( X1_test, X2_test )
+X_test = np.dstack([X1_test, X2_test]).reshape(resolution, resolution, 2)
+
+print(X_test.shape)
 
 # predict training set
-mean, var = m.predict_y(X)
+mean, _ = m.predict_y( X_test )
+mean = tf.squeeze(mean)
 
-print(X.shape)
-mean_square = np.array(mean[:,1]).reshape(x1_mesh.shape) # Shape: (num,num)
-plt.scatter(X1_plot, Y_plot, c='r')
-plt.scatter(X1_plot, mean_square[:,0])
-plt.show()
-plt.scatter(X2_plot, Y_plot, c='r')
-plt.scatter(X2_plot, mean_square[:,1])
-plt.show()
-#var_square = var.reshape(x1_mesh.shape) # Shape: (num,num)
-fig = plt.figure(figsize=(16, 12))
-ax = Axes3D(fig)
-ax.scatter(X1_plot, X2_plot, Y_plot, s=100, c='b')
-ax.plot_surface(x1_mesh, x2_mesh, mean_square, alpha=0.1)
-
-mean, var = m.predict_y(X)
-mean_square = np.array(mean[:,1]).reshape(x1_mesh.shape) # Shape: (num,num)
-var_square = np.array(var)[:,1].reshape(x1_mesh.shape) # Shape: (num,num)
-
-fig = plt.figure(figsize=(16, 12))
+fig = plt.figure()
 ax = plt.axes(projection='3d')
-ax.plot_surface(x1_mesh, x2_mesh, mean_square, linewidth=0.5, antialiased=True, alpha=0.1)
-cbar = ax.contourf(x1_mesh, x2_mesh, mean_square, zdir='z', antialiased=True, alpha=0.1)
-ax.scatter3D(X1_plot, X2_plot, Y_plot, marker='o',edgecolors='k', color='r', s=150)
-fig.colorbar(cbar)
+ax.plot_surface(X1_test, X2_test, mean, antialiased=True, alpha=0.5, linewidth=0.5, cmap='winter')
+ax.scatter3D(X1, X2, Y, marker='o',edgecolors='k', color='r', s=150)
+ax.set_xlabel('B-V Index')
+ax.set_ylabel('Rotation Period (Days)')
+ax.set_zlabel('Age (Gyr)')
 plt.show()
-
+plt.legend()
