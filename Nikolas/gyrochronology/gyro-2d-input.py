@@ -23,14 +23,16 @@ X1 = X1_plot = data[:100,2]
 X2 = X2_plot = data[:100,3]
 
 #np.random.seed(1991)
-meanf = gpflow.mean_functions.Constant(c=1.5)
-k = gpflow.kernels.Matern12(variance=10.0, lengthscales=[0.2, 10])
+meanf = gpflow.mean_functions.Zero()
+k = gpflow.kernels.Matern12(variance=10.0, lengthscales=[15, 1.0])
 X = np.dstack([X1, X2]).reshape(-1, 2)
 m = gpflow.models.GPR(data=(X, Y), kernel=k, mean_function=meanf)
+opt = gpflow.optimizers.Scipy()
+opt_logs = opt.minimize(m.training_loss, m.trainable_variables, options=dict(maxiter=100))
 
 x1_mesh, x2_mesh = np.meshgrid(X1, X2)
 
-resolution = 50
+resolution = len(Y)
 X1_test = np.linspace( 0.4, 1.5, num=resolution )
 X2_test = np.linspace( 1.0, 40.0, num=resolution )
 X1_test, X2_test = np.meshgrid( X1_test, X2_test )
@@ -51,3 +53,24 @@ ax.set_ylabel('Rotation Period (Days)')
 ax.set_zlabel('Age (Gyr)')
 plt.show()
 plt.legend()
+
+numElems = len(Y)
+idx = np.round(np.linspace(0, len(mean1.reshape(numElems**2)) - 1, numElems)).astype(int)
+# Picks equal spaced elements from (longer) prediction array so that its shape of data
+
+mu_test = (mean1.reshape(numElems**2)[idx])
+sd_test = (np.array(var).reshape(numElems**2)[idx]) 
+
+vals = np.sort([mu_test, sd_test], axis=1)
+
+plt.figure(figsize=(18,9))
+plt.errorbar(Y, vals[0,:], yerr=vals[1,:]**2, fmt='bo')
+plt.plot(np.linspace( np.min(Y), np.max(Y), num=resolution ), np.linspace( np.min(Y), np.max(Y), num=resolution ), 'r')
+plt.show()
+
+Z = (np.sort(data[::10,1])-vals[0,:])/vals[1,:]
+print(Y.shape)
+import seaborn as sns
+plt.hist(Z, density=True, bins=8)
+sns.distplot(np.random.normal(size=1000), hist=False)
+plt.show()
