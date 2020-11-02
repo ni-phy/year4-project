@@ -16,6 +16,7 @@ import tensorflow_probability as tfp
 import gpflow
 from gpflow.utilities import print_summary, set_trainable, to_default_float
 from mpl_toolkits.mplot3d import Axes3D
+from gpflow.ci_utils import ci_niter
 
 data = np.array(pd.read_csv('gyro_fake_data_v1.csv'))
 
@@ -47,14 +48,6 @@ mean1 = np.array(mean)
 mean1 = np.squeeze(mean1)
 mean = tf.squeeze(mean)
 
-from gpflow.ci_utils import ci_niter
-
-kernel = gpflow.kernels.Matern52()
-mean_function = gpflow.mean_functions.Linear()
-model = gpflow.models.GPR(data=(X,Y), kernel=kernel)
-
-optimizer = gpflow.optimizers.Scipy()
-optimizer.minimize(model.training_loss, model.trainable_variables, options=dict(maxiter=100))
 
 num_burnin_steps = ci_niter(300)
 num_samples = ci_niter(500)
