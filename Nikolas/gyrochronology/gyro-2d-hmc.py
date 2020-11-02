@@ -58,13 +58,10 @@ model.kernel.lengthscales.prior = tfp.distributions.Gamma(
     gpflow.utilities.to_default_float(1.0), gpflow.utilities.to_default_float(1.0)
 )
 
-
 # Note that here we need model.trainable_parameters, not trainable_variables - only parameters can have priors!
-# hmc_helper = gpflow.optimizers.SamplingHelper(
-#     model.log_posterior_density, model.kernel.lengthscales
-# )
-def hmc_helper(x):
-  return - x**0.5
+
+hmc_helper = gpflow.optimizers.SamplingHelper(
+     model.log_posterior_density, model.trainable_parameters)
 
 hmc = tfp.mcmc.HamiltonianMonteCarlo(
     target_log_prob_fn=hmc_helper, num_leapfrog_steps=10, step_size=0.01
@@ -92,43 +89,43 @@ def run_chain():
 
 
 sample_mean, sample_stddev, is_accepted = run_chain()
-parameter_samples = hmc_helper(sample_mean)
 
-param_to_name = {param: name for name, param in gpflow.utilities.parameter_dict(model).items()}
+print('mean:{:.4f}  stddev:{:.4f}  acceptance:{:.4f}'.format(
+    sample_mean.numpy(), sample_stddev.numpy(), is_accepted.numpy()))
 
-def plot_joint_marginals(samples, parameters, y_axis_label):
-    name_to_index = {param_to_name[param]: i for i, param in enumerate(parameters)}
-    f, axs = plt.subplots(1, 3, figsize=(12, 4), constrained_layout=True)
+# def plot_joint_marginals(samples, parameters, y_axis_label):
+#     name_to_index = {param_to_name[param]: i for i, param in enumerate(parameters)}
+#     f, axs = plt.subplots(1, 3, figsize=(12, 4), constrained_layout=True)
 
-    axs[0].plot(
-        samples[name_to_index[".likelihood.variance"]],
-        samples[name_to_index[".kernel.variance"]],
-        "k.",
-        alpha=0.15,
-    )
-    axs[0].set_xlabel("noise_variance")
-    axs[0].set_ylabel("signal_variance")
+#     axs[0].plot(
+#         samples[name_to_index[".likelihood.variance"]],
+#         samples[name_to_index[".kernel.variance"]],
+#         "k.",
+#         alpha=0.15,
+#     )
+#     axs[0].set_xlabel("noise_variance")
+#     axs[0].set_ylabel("signal_variance")
 
-    axs[1].plot(
-        samples[name_to_index[".likelihood.variance"]],
-        samples[name_to_index[".kernel.lengthscales"]],
-        "k.",
-        alpha=0.15,
-    )
-    axs[1].set_xlabel("noise_variance")
-    axs[1].set_ylabel("lengthscale")
+#     axs[1].plot(
+#         samples[name_to_index[".likelihood.variance"]],
+#         samples[name_to_index[".kernel.lengthscales"]],
+#         "k.",
+#         alpha=0.15,
+#     )
+#     axs[1].set_xlabel("noise_variance")
+#     axs[1].set_ylabel("lengthscale")
 
-    axs[2].plot(
-        samples[name_to_index[".kernel.lengthscales"]],
-        samples[name_to_index[".kernel.variance"]],
-        "k.",
-        alpha=0.1,
-    )
-    axs[2].set_xlabel("lengthscale")
-    axs[2].set_ylabel("signal_variance")
-    f.suptitle(y_axis_label)
-    plt.show()
+#     axs[2].plot(
+#         samples[name_to_index[".kernel.lengthscales"]],
+#         samples[name_to_index[".kernel.variance"]],
+#         "k.",
+#         alpha=0.1,
+#     )
+#     axs[2].set_xlabel("lengthscale")
+#     axs[2].set_ylabel("signal_variance")
+#     f.suptitle(y_axis_label)
+#     plt.show()
 
 
-plot_joint_marginals(sample_mean, model.trainable_parameters, "unconstrained variable samples")
-plot_joint_marginals(parameter_samples, model.trainable_parameters, "parameter samples")
+# plot_joint_marginals(sample_mean, model.trainable_parameters, "unconstrained variable samples")
+# plot_joint_marginals(parameter_samples, model.trainable_parameters, "parameter samples")
