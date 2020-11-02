@@ -54,9 +54,9 @@ num_samples = ci_niter(500)
 
 print(model.trainable_parameters)
 
-model.kernel.lengthscales.prior = tfp.distributions.Gamma(
-    gpflow.utilities.to_default_float(1.0), gpflow.utilities.to_default_float(1.0)
-)
+# model.kernel.lengthscales.prior = tfp.distributions.Gamma(
+#     gpflow.utilities.to_default_float(1.0), gpflow.utilities.to_default_float(1.0)
+# )
 
 # Note that here we need model.trainable_parameters, not trainable_variables - only parameters can have priors!
 
