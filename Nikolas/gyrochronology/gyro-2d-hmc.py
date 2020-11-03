@@ -48,15 +48,26 @@ mean1 = np.array(mean)
 mean1 = np.squeeze(mean1)
 mean = tf.squeeze(mean)
 
+f64 = gpflow.utilities.to_default_float
+
+for p in model.trainable_parameters:
+  p.prior = tfp.distributions.Gamma(
+      gpflow.utilities.to_default_float(1.0), gpflow.utilities.to_default_float(1.0)
+  )
+
+hmc_helper = gpflow.optimizers.SamplingHelper(
+    model.log_posterior_density, model.trainable_parameters
+)
+
+hmc = tfp.mcmc.HamiltonianMonteCarlo(
+    target_log_prob_fn=hmc_helper.target_log_prob_fn, num_leapfrog_steps=10, step_size=0.01
+)
+adaptive_hmc = tfp.mcmc.SimpleStepSizeAdaptation(
+    hmc, num_adaptation_steps=10, target_accept_prob=f64(0.75), adaptation_rate=0.1
+)
 
 num_burnin_steps = ci_niter(300)
 num_samples = ci_niter(500)
-
-print(model.trainable_parameters)
-
-model.kernel.lengthscales.prior = tfp.distributions.Gamma(
-    gpflow.utilities.to_default_float(1.0), gpflow.utilities.to_default_float(1.0)
-)
 
 # Note that here we need model.trainable_parameters, not trainable_variables - only parameters can have priors!
 
@@ -73,59 +84,54 @@ adaptive_hmc = tfp.mcmc.SimpleStepSizeAdaptation(
 num_results = int(10e3)
 num_burnin_steps = int(1e3)
 
-@tf.function
-def run_chain():
- samples, is_accepted = tfp.mcmc.sample_chain(
-      num_results=num_results,
-      num_burnin_steps=num_burnin_steps,
-      current_state=1.,
-      kernel=adaptive_hmc,
-      trace_fn=lambda _, pkr: pkr.inner_results.is_accepted)
- sample_mean = tf.reduce_mean(samples)
- sample_stddev = tf.math.reduce_std(samples)
- is_accepted = tf.reduce_mean(tf.cast(is_accepted, dtype=tf.float32))
- return sample_mean, sample_stddev, is_accepted
+def run_chain_fn():
+    return tfp.mcmc.sample_chain(
+        num_results=num_samples,
+        num_burnin_steps=num_burnin_steps,
+        current_state=hmc_helper.current_state,
+        kernel=adaptive_hmc,
+        trace_fn=lambda _, pkr: pkr.inner_results.is_accepted,
+    )
 
 
+samples, traces = run_chain_fn()
+parameter_samples = hmc_helper.convert_to_constrained_values(samples)
 
-sample_mean, sample_stddev, is_accepted = run_chain()
+param_to_name = {param: name for name, param in gpflow.utilities.parameter_dict(model).items()}
+sample_mean = []
+sample_stddev = []
+is_accepted = []
 
-print('mean:{:.4f}  stddev:{:.4f}  acceptance:{:.4f}'.format(
-    sample_mean.numpy(), sample_stddev.numpy(), is_accepted.numpy()))
+print(np.mean(np.array(samples[0][:]), axis=0))
+i = 0
+# for p in model.trainable_parameters:
+#   p.assign(np.mean(np.array(samples[i][100:])))
+#   i = i+1
+model.kernel.lengthscales.assign(np.mean(np.array(samples[1][:]), axis=0))
+model.kernel.variance.assign(np.mean(np.array(samples[1][:])))
+model.likelihood.variance.assign(np.mean(np.array(samples[2][:])))
+#assigning lengthscales doesn't seem to work
+print(model.trainable_parameters)
 
-# def plot_joint_marginals(samples, parameters, y_axis_label):
-#     name_to_index = {param_to_name[param]: i for i, param in enumerate(parameters)}
-#     f, axs = plt.subplots(1, 3, figsize=(12, 4), constrained_layout=True)
+#Testing quality of results
 
-#     axs[0].plot(
-#         samples[name_to_index[".likelihood.variance"]],
-#         samples[name_to_index[".kernel.variance"]],
-#         "k.",
-#         alpha=0.15,
-#     )
-#     axs[0].set_xlabel("noise_variance")
-#     axs[0].set_ylabel("signal_variance")
+numElems = len(Y)
+idx = np.round(np.linspace(0, len(mean1.reshape(numElems**2)) - 1, numElems)).astype(int)
+# Picks equal spaced elements from (longer) prediction array so that its shape of data
 
-#     axs[1].plot(
-#         samples[name_to_index[".likelihood.variance"]],
-#         samples[name_to_index[".kernel.lengthscales"]],
-#         "k.",
-#         alpha=0.15,
-#     )
-#     axs[1].set_xlabel("noise_variance")
-#     axs[1].set_ylabel("lengthscale")
+mu_test = (mean1.reshape(numElems**2)[idx])
+sd_test = (np.array(var).reshape(numElems**2)[idx]) 
 
-#     axs[2].plot(
-#         samples[name_to_index[".kernel.lengthscales"]],
-#         samples[name_to_index[".kernel.variance"]],
-#         "k.",
-#         alpha=0.1,
-#     )
-#     axs[2].set_xlabel("lengthscale")
-#     axs[2].set_ylabel("signal_variance")
-#     f.suptitle(y_axis_label)
-#     plt.show()
+vals = np.sort([mu_test, sd_test], axis=1)
 
+plt.figure(figsize=(18,9))
+plt.errorbar(Y, vals[0,:], yerr=vals[1,:]**2, fmt='bo')
+plt.plot(np.linspace( np.min(Y), np.max(Y), num=resolution ), np.linspace( np.min(Y), np.max(Y), num=resolution ), 'r')
+plt.show()
 
-# plot_joint_marginals(sample_mean, model.trainable_parameters, "unconstrained variable samples")
-# plot_joint_marginals(parameter_samples, model.trainable_parameters, "parameter samples")
+Z = (np.sort(data[::2,1])-vals[0,:])/vals[1,:]
+print(Y.shape)
+import seaborn as sns
+plt.hist(Z, density=True, bins=8)
+sns.distplot(np.random.normal(size=1000), hist=False)
+plt.show()
