@@ -16,6 +16,22 @@ import gpflow
 from gpflow.utilities import print_summary, set_trainable, to_default_float
 from mpl_toolkits.mplot3d import Axes3D
 
+class mean_f(gpflow.mean_functions.MeanFunction):
+  def __init__(self, A1=None, A2=None, b=None):
+    MeanFunction.__init__(self)
+    A1 = np.ones((1, 1), dtype=default_float()) if A is None else A1
+    A2 = np.ones((1, 1), dtype=default_float()) if A is None else A2
+    A1, A2 = np.meshgrid(A1, A2)
+    A12 = np.dstack([A1, A2]).reshape(len(A1), len(A2), 2)
+    b1 = np.zeros(1, dtype=default_float()) if b is None else b
+    b2 = np.zeros(1, dtype=default_float()) if b is None else b
+    b1, b2 = np.meshgrid(b1, b2)
+    b12 =np.dstack([b1,b2]).reshape(len(A1), len(A2), 2)
+    self.b = Parameter(b)
+  def __call__(self,X):
+    return tf.tensordot(X, self.A12, [[-1], [0]]) + self.b12
+
+
 data = np.array(pd.read_csv('gyro_fake_data_v1.csv'))
 
 Y = Y_plot = data[:100,1].reshape(-1,1)
