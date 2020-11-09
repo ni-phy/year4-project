@@ -18,6 +18,9 @@ import io
 
 uploaded = files.upload()
 
+def mean_fn(index_points):
+  return tf.reshape(3*index_points, shape=[int(len(index_points))/2, 2])
+
 data = np.array(pd.read_csv(io.BytesIO(uploaded['gyro_fake_data_v1.csv'])))
 
 tf.enable_v2_behavior()
@@ -56,7 +59,7 @@ gprm = tfd.GaussianProcessRegressionModel(
     kernel=kernel,
     index_points=X_test,
     observation_index_points=X,
-    observations=Y.T)
+    observations=Y.T, mean_fn=mean_fn)
 
 samples = gprm.sample(10)
 # ==> 10 independently drawn, joint samples at `index_points`.
