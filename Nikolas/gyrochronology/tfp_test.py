@@ -41,7 +41,7 @@ y1 = Y_new
 y2 = Y_new
 
 observation_index_points = X 
-observations = np.dstack([y1,y2]).reshape(-1, 2)
+observations = Y.T #np.dstack([y1,y2]).reshape(-1, 2)
 
 x1_mesh, x2_mesh = np.meshgrid(X1, X2)
 
@@ -53,15 +53,35 @@ X_test = np.dstack([X1_test, X2_test]).reshape(resolution, resolution, 2)
 observation_noise_variance = np.ones(resolution).reshape(-1,1)
 
 print(observation_index_points.shape, observations.shape)
-kernel = psd_kernels.MaternFiveHalves()*psd_kernels.MaternFiveHalves()
+amplitude = tfp.util.TransformedVariable(
+  1., tfb.Exp(), dtype=tf.float64, name='amplitude')
+length_scale = tfp.util.TransformedVariable(
+  1., tfb.Exp(), dtype=tf.float64, name='length_scale')
+kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
 
-gprm = tfd.GaussianProcessRegressionModel(
+#observation_noise_variance = tfp.util.TransformedVariable(
+#    np.exp(-5), tfb.Exp(), name='observation_noise_variance')
+
+optimizer = tf.optimizers.Adam(learning_rate=.05, beta_1=.5, beta_2=.99)
+
+@tf.function
+def optimize():
+  with tf.GradientTape() as tape:
+    loss = -gp.log_prob(observations)
+  grads = tape.gradient(loss, gp.trainable_variables)
+  optimizer.apply_gradients(zip(grads, gp.trainable_variables))
+  return loss
+
+gp = tfd.GaussianProcessRegressionModel(
     kernel=kernel,
     index_points=X_test,
     observation_index_points=X,
     observations=Y.T, mean_fn=mean_fn)
 
-samples = gprm.sample(10)
+for i in range(1000):
+  neg_log_likelihood_ = optimize()
+
+samples = gp.sample(10)
 # ==> 10 independently drawn, joint samples at `index_points`.
 # ==> 10 independently drawn, noisy joint samples at `index_points`
 
