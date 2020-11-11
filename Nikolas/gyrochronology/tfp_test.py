@@ -13,15 +13,16 @@ import matplotlib.pyplot as plt
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from mpl_toolkits.mplot3d import Axes3D
-from google.colab import files
-import io
+# from google.colab import files
+# import io
 
-uploaded = files.upload()
+# uploaded = files.upload()
 
 def mean_fn(index_points):
   return tf.reshape(3*index_points, shape=[int(len(index_points))/2, 2])
 
-data = np.array(pd.read_csv(io.BytesIO(uploaded['gyro_fake_data_v1.csv'])))
+#data = np.array(pd.read_csv(io.BytesIO(uploaded['gyro_fake_data_v1.csv'])))
+data = np.array(pd.read_csv('gyro_fake_data_v1.csv'))
 
 tf.enable_v2_behavior()
 
@@ -30,15 +31,11 @@ tfd = tfp.distributions
 psd_kernels = tfp.math.psd_kernels
 
 # observations from a known function at some random points.
-
-Y = Y_plot = data[::100,1].reshape(-1,1)
-Y_new = data[::100,1]
-X1 = X1_plot = data[::100,3] #rotation
-X2 = X2_plot = data[::100,2] #B_V
+a=3
+Y = Y_plot = data[::a,1].reshape(-1,1)
+X1 = X1_plot = data[::a,3] #rotation
+X2 = X2_plot = data[::a,2] #B_V
 X = np.dstack([X1, X2]).reshape(-1, 2)
-
-y1 = Y_new
-y2 = Y_new
 
 observation_index_points = X 
 observations = Y.T #np.dstack([y1,y2]).reshape(-1, 2)
@@ -57,7 +54,9 @@ amplitude = tfp.util.TransformedVariable(
   1., tfb.Exp(), dtype=tf.float64, name='amplitude')
 length_scale = tfp.util.TransformedVariable(
   1., tfb.Exp(), dtype=tf.float64, name='length_scale')
-kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
+kernel = psd_kernels.ExponentiatedQuadratic(
+  amplitude,length_scale)*psd_kernels.ExponentiatedQuadratic(
+    amplitude, length_scale=3)
 
 #observation_noise_variance = tfp.util.TransformedVariable(
 #    np.exp(-5), tfb.Exp(), name='observation_noise_variance')
@@ -80,8 +79,11 @@ gp = tfd.GaussianProcessRegressionModel(
 
 for i in range(1000):
   neg_log_likelihood_ = optimize()
+  if i % 100 == 0:
+    print("Step {}: NLL = {}".format(i, neg_log_likelihood_))
 
 samples = gp.sample(10)
+var = gp.variance()
 # ==> 10 independently drawn, joint samples at `index_points`.
 # ==> 10 independently drawn, noisy joint samples at `index_points`
 
@@ -95,3 +97,24 @@ ax.set_ylabel('Rotation Period (Days)')
 ax.set_zlabel('Age (Gyr)')
 
 plt.show()
+
+numElems = len(Y)
+idx = np.round(np.linspace(0, len(np.array(samples[9]).reshape(numElems**2)) - 1, numElems)).astype(int)
+# Picks equal spaced elements from (longer) prediction array so that its shape of data
+
+mu_test = (np.array(samples[9]).reshape(numElems**2)[idx])
+sd_test = (np.array(var).reshape(numElems**2)[idx]) 
+
+vals = np.sort([mu_test, sd_test], axis=1)
+
+print(vals.shape)
+
+plt.figure(figsize=(18,9))
+plt.errorbar(Y, vals[0,:], yerr=vals[1,:]**2, fmt='bo')
+plt.plot(np.linspace( np.min(Y), np.max(Y), num=resolution ), np.linspace( np.min(Y), np.max(Y), num=resolution ), 'r')
+
+Z = (np.sort(data[::3,1])-vals[0,:])/vals[1,:]
+print(Y.shape)
+import seaborn as sns
+plt.hist(Z, density=True, bins=8)
+sns.distplot(np.random.normal(size=1000), hist=False)
