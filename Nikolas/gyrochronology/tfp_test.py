@@ -18,8 +18,21 @@ from mpl_toolkits.mplot3d import Axes3D
 
 # uploaded = files.upload()
 
-def mean_fn(index_points):
-  return tf.reshape(3*index_points, shape=[int(len(index_points))/2, 2])
+def mean_fn(x, y, a, b, c, d):
+  return (((x*1000)**a) * b*(y - c)**d)
+#fn from Barnes 2007
+
+#rouch check the fn works
+a = 0.5189
+b=0.75
+c=0.4
+d=0.601
+y = data[:,3]
+x = mean_fn(data[:,1], data[:,2], a, b, c ,d)
+plt.scatter(data[:,1], x, c=data[:,2], cmap='hsv')
+print(np.mean(x), np.mean(y), np.mean(x-y))
+plt.show()
+plt.scatter(data[:,1], data[:,3], c=data[:,2], cmap='hsv')
 
 #data = np.array(pd.read_csv(io.BytesIO(uploaded['gyro_fake_data_v1.csv'])))
 data = np.array(pd.read_csv('gyro_fake_data_v1.csv'))
@@ -32,13 +45,9 @@ psd_kernels = tfp.math.psd_kernels
 
 # observations from a known function at some random points.
 a=3
-Y = Y_plot = data[::a,1].reshape(-1,1)
-X1 = X1_plot = data[::a,3] #rotation
+X1 = X1_plot = data[::a,1] #rotation
 X2 = X2_plot = data[::a,2] #B_V
 X = np.dstack([X1, X2]).reshape(-1, 2)
-
-observation_index_points = X 
-observations = Y.T #np.dstack([y1,y2]).reshape(-1, 2)
 
 x1_mesh, x2_mesh = np.meshgrid(X1, X2)
 
@@ -47,19 +56,23 @@ X1_test = np.linspace( np.min(X1), np.max(X1), num=resolution )
 X2_test = np.linspace( np.min(X2), np.max(X2), num=resolution )
 X1_test, X2_test = np.meshgrid( X1_test, X2_test )
 X_test = np.dstack([X1_test, X2_test]).reshape(resolution, resolution, 2)
-observation_noise_variance = np.ones(resolution).reshape(-1,1)
+Y = (data[::al, 3] - mean_fn(X1, X2, a, b, c, d)).reshape(-1,1)
 
 print(observation_index_points.shape, observations.shape)
 amplitude = tfp.util.TransformedVariable(
-  1., tfb.Exp(), dtype=tf.float64, name='amplitude')
+  10., tfb.Exp(), dtype=tf.float64, name='amplitude')
 length_scale = tfp.util.TransformedVariable(
-  1., tfb.Exp(), dtype=tf.float64, name='length_scale')
+  10., tfb.Exp(), dtype=tf.float64, name='length_scale')
 kernel = psd_kernels.ExponentiatedQuadratic(
   amplitude,length_scale)*psd_kernels.ExponentiatedQuadratic(
     amplitude, length_scale=3)
 
-#observation_noise_variance = tfp.util.TransformedVariable(
-#    np.exp(-5), tfb.Exp(), name='observation_noise_variance')
+observation_index_points = X 
+observations = Y.T
+kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale=10)* psd_kernels.ExponentiatedQuadratic(amplitude, length_scale=1)
+
+observation_noise_variance = tfp.util.TransformedVariable(
+   np.exp(0), tfb.Exp(), name='observation_noise_variance')
 
 optimizer = tf.optimizers.Adam(learning_rate=.05, beta_1=.5, beta_2=.99)
 
@@ -98,6 +111,10 @@ ax.set_zlabel('Age (Gyr)')
 
 plt.show()
 
+plt.scatter(X1_test, samples[0]+mean_fn(X1_test, X2_test, a, b, c ,d)
+            , cmap='hsv', c=X2_test)
+plt.show() #checking the data looks like prediction
+
 numElems = len(Y)
 idx = np.round(np.linspace(0, len(np.array(samples[9]).reshape(numElems**2)) - 1, numElems)).astype(int)
 # Picks equal spaced elements from (longer) prediction array so that its shape of data
@@ -110,11 +127,21 @@ vals = np.sort([mu_test, sd_test], axis=1)
 print(vals.shape)
 
 plt.figure(figsize=(18,9))
-plt.errorbar(Y, vals[0,:], yerr=vals[1,:]**2, fmt='bo')
-plt.plot(np.linspace( np.min(Y), np.max(Y), num=resolution ), np.linspace( np.min(Y), np.max(Y), num=resolution ), 'r')
+print(Y.shape, X1.shape)
+plt.errorbar(np.sort(data[::al,3]), vals[0,:], yerr=vals[1,:]**2, fmt='bo')
+#plt.scatter(Y+mean_fn(data[::al,1], data[::al,2], a, b, c, d).reshape(-1,1), vals[0,:])
+plt.plot(np.linspace( np.min(vals[0,:]), np.max(vals[0,:]), num=resolution ), 
+         np.linspace( np.min(vals[0,:]), np.max(vals[0,:]), num=resolution ), 'r')
+#plt.ylim((0,20))
+plt.xlabel('Data')
+plt.ylabel('Prediction')
 
+#checking the std
 Z = (np.sort(data[::3,1])-vals[0,:])/vals[1,:]
-print(Y.shape)
-import seaborn as sns
 plt.hist(Z, density=True, bins=8)
-sns.distplot(np.random.normal(size=1000), hist=False)
+mu, sigma = 0, 1 # mean and standard deviation
+s = np.random.normal(mu, sigma, 1000)
+count, bins, ignored = plt.hist(s, 30, density=True)
+plt.plot(bins, 1/(sigma * np.sqrt(2 * np.pi)) *
+               np.exp( - (bins - mu)**2 / (2 * sigma**2) ),
+         linewidth=2, color='r')
