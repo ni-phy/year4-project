@@ -44,8 +44,14 @@ tfd = tfp.distributions
 psd_kernels = tfp.math.psd_kernels
 
 # observations from a known function at some random points.
+<<<<<<< HEAD
 a=3
 X1 = X1_plot = data[::a,1] #rotation
+=======
+a=10
+Y = Y_plot = data[::a,1].reshape(-1,1)
+X1 = X1_plot = data[::a,3] #rotation
+>>>>>>> ee128c4bfafac815c3c5928cde00aff589039913
 X2 = X2_plot = data[::a,2] #B_V
 X = np.dstack([X1, X2]).reshape(-1, 2)
 
@@ -56,7 +62,11 @@ X1_test = np.linspace( np.min(X1), np.max(X1), num=resolution )
 X2_test = np.linspace( np.min(X2), np.max(X2), num=resolution )
 X1_test, X2_test = np.meshgrid( X1_test, X2_test )
 X_test = np.dstack([X1_test, X2_test]).reshape(resolution, resolution, 2)
+<<<<<<< HEAD
 Y = (data[::al, 3] - mean_fn(X1, X2, a, b, c, d)).reshape(-1,1)
+=======
+observation_noise_variance = np.ones(resolution)#.reshape(-1,1)
+>>>>>>> ee128c4bfafac815c3c5928cde00aff589039913
 
 print(observation_index_points.shape, observations.shape)
 amplitude = tfp.util.TransformedVariable(
@@ -64,7 +74,7 @@ amplitude = tfp.util.TransformedVariable(
 length_scale = tfp.util.TransformedVariable(
   10., tfb.Exp(), dtype=tf.float64, name='length_scale')
 kernel = psd_kernels.ExponentiatedQuadratic(
-  amplitude,length_scale)*psd_kernels.ExponentiatedQuadratic(
+  amplitude,length_scale=10)*psd_kernels.ExponentiatedQuadratic(
     amplitude, length_scale=3)
 
 observation_index_points = X 
@@ -88,9 +98,9 @@ gp = tfd.GaussianProcessRegressionModel(
     kernel=kernel,
     index_points=X_test,
     observation_index_points=X,
-    observations=Y.T, mean_fn=mean_fn)
+    observations=Y.T, observation_noise_variance = observation_noise_variance)
 
-for i in range(1000):
+for i in range(100):
   neg_log_likelihood_ = optimize()
   if i % 100 == 0:
     print("Step {}: NLL = {}".format(i, neg_log_likelihood_))
@@ -103,7 +113,7 @@ var = gp.variance()
 fig = plt.figure(figsize=(18, 10))
 ax = plt.axes(projection='3d')
 ax.view_init(0, 40)
-ax.plot_surface(X1_test, X2_test, samples[0], antialiased=True, alpha=0.7, linewidth=0.5, cmap='winter')
+ax.plot_surface(X1_test, X2_test, samples[9], antialiased=True, alpha=0.7, linewidth=0.5, cmap='winter')
 ax.scatter3D(X1, X2, Y, marker='o',edgecolors='k', color='r', s=150)
 ax.set_xlabel('B-V Index')
 ax.set_ylabel('Rotation Period (Days)')
@@ -116,7 +126,7 @@ plt.scatter(X1_test, samples[0]+mean_fn(X1_test, X2_test, a, b, c ,d)
 plt.show() #checking the data looks like prediction
 
 numElems = len(Y)
-idx = np.round(np.linspace(0, len(np.array(samples[9]).reshape(numElems**2)) - 1, numElems)).astype(int)
+idx = np.round(np.linspace(0, len(np.array(samples[0]).reshape(numElems**2)) - 1, numElems)).astype(int)
 # Picks equal spaced elements from (longer) prediction array so that its shape of data
 
 mu_test = (np.array(samples[9]).reshape(numElems**2)[idx])
@@ -124,9 +134,8 @@ sd_test = (np.array(var).reshape(numElems**2)[idx])
 
 vals = np.sort([mu_test, sd_test], axis=1)
 
-print(vals.shape)
-
 plt.figure(figsize=(18,9))
+<<<<<<< HEAD
 print(Y.shape, X1.shape)
 plt.errorbar(np.sort(data[::al,3]), vals[0,:], yerr=vals[1,:]**2, fmt='bo')
 #plt.scatter(Y+mean_fn(data[::al,1], data[::al,2], a, b, c, d).reshape(-1,1), vals[0,:])
@@ -145,3 +154,16 @@ count, bins, ignored = plt.hist(s, 30, density=True)
 plt.plot(bins, 1/(sigma * np.sqrt(2 * np.pi)) *
                np.exp( - (bins - mu)**2 / (2 * sigma**2) ),
          linewidth=2, color='r')
+=======
+plt.errorbar(Y, vals[0,:], yerr=vals[1,:]**2, fmt='bo')
+plt.plot(np.linspace( np.min(Y), np.max(Y), num=resolution ), np.linspace( np.min(Y), np.max(Y), num=resolution ), 'r')
+
+plt.show()
+
+Z = (np.sort(data[::a,1])-vals[0,:])/vals[1,:]
+print(Y.shape)
+import seaborn as sns
+plt.hist(Z, density=True, bins=8)
+sns.distplot(np.random.normal(size=1000), hist=False)
+plt.show()
+>>>>>>> ee128c4bfafac815c3c5928cde00aff589039913
