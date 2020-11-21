@@ -65,7 +65,7 @@ cax = divider.append_axes('right', size='5%', pad=0.05)
 im = ax.scatter(data1[:,2], data1[:,1], c=bv, cmap='hsv')
 fig.colorbar(im, cax=cax, orientation='vertical', label='B-V')
 
-data = data1
+#data = data1
 tf.enable_v2_behavior()
 
 tfb = tfp.bijectors
@@ -76,15 +76,17 @@ psd_kernels = tfp.math.psd_kernels
 al = 10
 X1 = data[::al,2] #age
 X2 = r.t2bv(data[::al,0])#data[::al,2] #B_V
-X = np.dstack([X1, X2]).reshape(-1, 2)
+X3 = data[::al, 3]
+X = np.dstack([X1, X2, X3]).reshape(-1, 3)
 
-x1_mesh, x2_mesh = np.meshgrid(X1, X2)
+x1_mesh, x2_mesh, x3_mest = np.meshgrid(X1, X2, X3)
 
 resolution = len(X1)
 X1_test = X1_plot = np.linspace( np.min(X1), np.max(X1), num=resolution )
 X2_test = X2_plot = np.linspace( np.min(X2), np.max(X2), num=resolution )
-X1_test, X2_test = np.meshgrid( X1_test, X2_test )
-X_test = np.dstack([X1_test, X2_test]).reshape(resolution, resolution, 2)
+X3_test = X3_plot = np.linspace( np.min(X2), np.max(X2), num=resolution )
+X1_test, X2_test, X3_test = np.meshgrid( X1_test, X2_test, X3_test )
+X_test = np.dstack([X1_test, X2_test, X3_test]).reshape(resolution, resolution, resolution, 3)
 a = 0.5189
 b=0.75
 c=0.4
@@ -153,14 +155,14 @@ cax = divider.append_axes('right', size='5%', pad=0.05)
 # plt.xlabel('Rotation(Days)')
 # plt.ylabel('Age (Gyr)')
 
-im = ax.scatter(X1_test, samples[0]+mean_fn(X1_test, X2_test, a, b, c ,d), cmap='hsv', c=X2_test)
+im = ax.scatter(X1_test, samples[0][0]+mean_fn(X1_test, X2_test, a, b, c ,d), cmap='hsv', c=X2_test)
 fig.colorbar(im, cax=cax, orientation='vertical', label='B-V')
 plt.show()
 
 fig = plt.figure(figsize=(18, 10))
 ax = plt.axes(projection='3d')
 ax.view_init(20, 60)
-ax.plot_surface(X1_test, X2_test, samples[0]+mean_fn(X1_test, X2_test, a, b, c, d), antialiased=True, alpha=0.7, linewidth=0.5, cmap='winter')
+ax.plot_surface(X1_test, X2_test, samples[0][0]+mean_fn(X1_test, X2_test, a, b, c, d), antialiased=True, alpha=0.7, linewidth=0.5, cmap='winter')
 ax.scatter3D(X1, X2, (data[::al,1]).reshape(-1,1), 
              marker='o',edgecolors='k', color='r', s=150)
 #ax.set_zlim(0, 50)
@@ -185,7 +187,7 @@ print(vals.shape)
 plt.figure(figsize=(18,9))
 print(Y.shape, X1.shape)
 plt.errorbar(np.sort(data[::al,1]), vals[0,:], yerr=vals[1,:], fmt='bo')
-plt.scatter(np.sort(data[::al,1]), vals[0,:])
+plt.scatter(np.sort(data[::al,1]), np.sort(mu_test))
 plt.plot(np.linspace( np.min(vals[0,:]), np.max(vals[0,:]), num=resolution ), 
          np.linspace( np.min(vals[0,:]), np.max(vals[0,:]), num=resolution ), 'r')
 
