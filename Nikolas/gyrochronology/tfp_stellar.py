@@ -145,7 +145,7 @@ for i in range(1000):
 print("Final NLL = {}".format(neg_log_likelihood_))
 
 samples = gp.sample(10).numpy()
-var = gp.variance()
+var = np.array(gp.variance())
 # ==> 10 independently drawn, joint samples at `index_points`.
 # ==> 10 independently drawn, noisy joint samples at `index_points`
 
@@ -173,7 +173,7 @@ ax.set_zlabel('Age (Gyr)')
 plt.show()
 
 numElems = len(Y)
-sample = samples[0]+mean_fn(X1, X2, a ,b ,c ,d)
+sample = samples[0][0]+mean_fn(X1[0], X2[0], a ,b ,c ,d)
 idx = np.round(np.linspace(0, len(np.array(sample).reshape(numElems**2)) - 1, numElems)).astype(int)
 # Picks equal spaced elements from (longer) prediction array so that its shape of data
 
