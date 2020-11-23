@@ -98,6 +98,8 @@ length_scale = tfp.util.TransformedVariable(
   20., tfb.Exp(), dtype=tf.float64, name='length_scale')
 length_scale1 = tfp.util.TransformedVariable(
   20., tfb.Exp(), dtype=tf.float64, name='length_scale')
+length_scale1 = tfp.util.TransformedVariable(
+  10., tfb.Exp(), dtype=tf.float64, name='length_scale')
 # a =  tfp.util.TransformedVariable(
 #   0.5189, tfb.Exp(), dtype=tf.float64, name='a')
 # b = tfp.util.TransformedVariable(
@@ -111,10 +113,13 @@ Y = (data[::al, 1] - mean_fn(X1, X2, a, b, c, d))#.reshape(-1,1)
 
 observation_index_points = X 
 observations = Y#.T
-kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale=10)* psd_kernels.ExponentiatedQuadratic(amplitude, length_scale=1)
+kernel = psd_kernels.ExponentiatedQuadratic(amplitude,
+ length_scale)*psd_kernels.ExponentiatedQuadratic(amplitude,
+  length_scale1)*psd_kernels.ExponentiatedQuadratic(amplitude,
+  length_scale)
 
 observation_noise_variance = tfp.util.TransformedVariable(
-   np.exp(0), tfb.Exp(), name='observation_noise_variance')
+   np.exp(1), tfb.Exp(), name='observation_noise_variance')
 
 optimizer = tf.optimizers.Adam(learning_rate=.05, beta_1=.5, beta_2=.99)
 
