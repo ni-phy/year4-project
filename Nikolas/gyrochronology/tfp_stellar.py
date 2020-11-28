@@ -22,9 +22,9 @@ uploaded = files.upload()
 
 data0 = data = np.array(pd.read_csv(io.BytesIO(uploaded['Data1.csv'])))
 
-def mean_fn(x, y, a, b, c, d):
-  return ((x*1000)**a * b*(y - c)**d)
-#fn from Barnes 2007
+def mean_fn(x, y, m, a, b, c, d):
+  return ((x*1000)**a * b*(y - c)**d)*m**0.5 
+#fn from Barnes 2007 the m relation was found through trial and error
 
 from PyAstronomy import pyasl
 r = pyasl.BallesterosBV_T()
@@ -112,7 +112,7 @@ length_scale1 = tfp.util.TransformedVariable(
 #   0.4, tfb.Exp(), dtype=tf.float64, name='c')
 # d = tfp.util.TransformedVariable(
 #   0.601, tfb.Exp(), dtype=tf.float64, name='d')
-Y = (data[::al, 1] - mean_fn(X1, X2, a, b, c, d))#.reshape(-1,1)
+Y = (data[::al, 1] - mean_fn(X1, X2, X3, a, b, c, d))#.reshape(-1,1)
 
 
 observation_index_points = X 
@@ -120,7 +120,7 @@ observations = Y#.T
 kernel = psd_kernels.ExponentiatedQuadratic(amplitude,
  length_scale)*psd_kernels.ExponentiatedQuadratic(amplitude1,
   length_scale1)*psd_kernels.ExponentiatedQuadratic(amplitude2,
-  length_scale)
+  length_scale2)
 
 observation_noise_variance = tfp.util.TransformedVariable(
    np.exp(1), tfb.Exp(), name='observation_noise_variance')
