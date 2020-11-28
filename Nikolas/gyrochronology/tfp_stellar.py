@@ -94,6 +94,10 @@ d=0.601
 
 amplitude = tfp.util.TransformedVariable(
   1., tfb.Exp(), dtype=tf.float64, name='amplitude')
+amplitude1 = tfp.util.TransformedVariable(
+  2., tfb.Exp(), dtype=tf.float64, name='amplitude')
+amplitude2 = tfp.util.TransformedVariable(
+  3., tfb.Exp(), dtype=tf.float64, name='amplitude')
 length_scale = tfp.util.TransformedVariable(
   20., tfb.Exp(), dtype=tf.float64, name='length_scale')
 length_scale1 = tfp.util.TransformedVariable(
@@ -114,14 +118,14 @@ Y = (data[::al, 1] - mean_fn(X1, X2, a, b, c, d))#.reshape(-1,1)
 observation_index_points = X 
 observations = Y#.T
 kernel = psd_kernels.ExponentiatedQuadratic(amplitude,
- length_scale)*psd_kernels.ExponentiatedQuadratic(amplitude,
-  length_scale1)*psd_kernels.ExponentiatedQuadratic(amplitude,
+ length_scale)*psd_kernels.ExponentiatedQuadratic(amplitude1,
+  length_scale1)*psd_kernels.ExponentiatedQuadratic(amplitude2,
   length_scale)
 
 observation_noise_variance = tfp.util.TransformedVariable(
    np.exp(1), tfb.Exp(), name='observation_noise_variance')
 
-optimizer = tf.optimizers.Adam(learning_rate=.05, beta_1=.5, beta_2=.99)
+optimizer = tf.optimizers.Adam(learning_rate=.5, beta_1=.5, beta_2=.99)
 
 # trainable_variables = [v.trainable_variables[0] for v in 
 #                        [amplitude_var,
@@ -139,7 +143,7 @@ gp = tfd.GaussianProcessRegressionModel(
     kernel=kernel,
     index_points=X_test,
     observation_index_points=observation_index_points,
-    observations=observations, observation_noise_variance=observation_noise_variance)
+    observations=observations, observation_noise_variance=.1)
 
 #First train the model, then draw and plot posterior samples.
 for i in range(1000):
