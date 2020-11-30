@@ -14,6 +14,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow import keras
+from tensorflow.keras import layers
+from tensorflow.keras.layers.experimental import preprocessing
 from mpl_toolkits.mplot3d import Axes3D
 from google.colab import files
 import io
@@ -25,6 +28,27 @@ data0 = data = np.array(pd.read_csv(io.BytesIO(uploaded['Data1.csv'])))
 def mean_fn(x, y, m, a, b, c, d):
   return ((x*1000)**a * b*(y - c)**d)*m**0.5 
 #fn from Barnes 2007 the m relation was found through trial and error
+
+def build_and_compile_model(norm):
+  model = keras.Sequential([
+      norm,
+      layers.Dense(64, activation='relu'),
+      layers.Dense(64, activation='relu'),
+      layers.Dense(1)
+  ])
+
+  model.compile(loss='mean_absolute_error',
+                optimizer=tf.keras.optimizers.Adam(0.001))
+  return model
+data_normalizer = preprocessing.Normalization(input_shape=[1,])
+data_normalizer.adapt(data[:,3])
+dnn_model = build_and_compile_model(data_normalizer)
+history = dnn_model.fit(
+    data['Mass'], data.pop,
+    validation_split=0.2,
+    verbose=0, epochs=100)
+x = tf.linspace(0.0, 250, 251)
+y = dnn_model.predict(x)
 
 from PyAstronomy import pyasl
 r = pyasl.BallesterosBV_T()
