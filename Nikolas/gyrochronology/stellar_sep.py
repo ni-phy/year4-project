@@ -91,6 +91,45 @@ gp = tfd.GaussianProcessRegressionModel(
 samples = gp.sample(10).numpy()
 var = gp.variance()
 
+amplitude1 = tfp.util.TransformedVariable(
+  3., tfb.Exp(), dtype=tf.float64, name='amplitude')
+length_scale1 = tfp.util.TransformedVariable(
+  .5, tfb.Exp(), dtype=tf.float64, name='length_scale')
+
+X_test = np.linspace( np.min(d3), np.max(d3), num=len(d3))[..., np.newaxis]
+observation_index_points = np.array(d3)[..., np.newaxis]
+
+observations = d0
+
+kernel = psd_kernels.MaternFiveHalves(amplitude1, length_scale1)
+observation_noise_variance = tfp.util.TransformedVariable(
+   np.exp(2), tfb.Exp(), name='observation_noise_variance')
+optimizer = tf.optimizers.Adam(learning_rate=.5, beta_1=.9, beta_2=.99)
+
+def optimize():
+  with tf.GradientTape() as tape:
+    loss = -gprm.log_prob(observations)
+  grads = tape.gradient(loss, gprm.trainable_variables)
+  optimizer.apply_gradients(zip(grads, gprm.trainable_variables))
+  return loss
+
+gprm = tfd.GaussianProcessRegressionModel(
+    kernel=kernel,
+    index_points=X_test,
+    observation_index_points=observation_index_points,
+    observations=observations, observation_noise_variance=observation_noise_variance)
+
+#First train the model, then draw and plot posterior samples.
+# for i in range(100):
+#   neg_log_likelihood_ = optimize()
+#   if i % 100 == 0:
+#     print('.')
+
+# print("Final NLL = {}".format(neg_log_likelihood_))
+
+samples1 = gprm.sample(10).numpy()
+var1 = gprm.variance()
+
 plt.scatter(X_test, samples[9])
 plt.scatter(d2, d1, c='k')
 
