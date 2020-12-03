@@ -25,8 +25,8 @@ uploaded = files.upload()
 
 data0 = data = np.array(pd.read_csv(io.BytesIO(uploaded['Data1.csv'])))
 
-def mean_fn(x, y, m, a, b, c, d):
-  return ((x*1000)**a * b*(y - c)**d)*m**0.5 
+def mean_fn(x, y, m, a, b, c, d, f):
+  return ((x*1000)**a * b*(y - c)**d)*m**f
 #fn from Barnes 2007 the m relation was found through trial and error
 
 def build_and_compile_model(norm):
@@ -44,7 +44,7 @@ data_normalizer = preprocessing.Normalization(input_shape=[1,])
 data_normalizer.adapt(data[:,3])
 dnn_model = build_and_compile_model(data_normalizer)
 history = dnn_model.fit(
-    data['Mass'], data.pop,
+    data[:, 3], data[:,1],
     validation_split=0.2,
     verbose=0, epochs=100)
 x = tf.linspace(0.0, 250, 251)
@@ -103,14 +103,11 @@ X2 = r.t2bv(data[::al,0])#data[::al,2] #B_V
 X3 = data[::al, 3]
 X = np.dstack([X1, X2, X3]).reshape(-1, 3)
 
-x1_mesh, x2_mesh, x3_mest = np.meshgrid(X1, X2, X3)
-
 resolution = len(X1)
 X1_test = X1_plot = np.linspace( np.min(X1), np.max(X1), num=resolution )
 X2_test = X2_plot = np.linspace( np.min(X2), np.max(X2), num=resolution )
 X3_test = X3_plot = np.linspace( np.min(X2), np.max(X2), num=resolution )
-X1_test, X2_test, X3_test = np.meshgrid( X1_test, X2_test, X3_test )
-X_test = np.dstack([X1_test, X2_test, X3_test]).reshape(resolution, resolution, resolution, 3)
+X_test = np.dstack([X1_test, X2_test, X3_test]).reshape(resolution, 3)
 a = 0.5189
 b=0.75
 c=0.4
@@ -128,15 +125,8 @@ length_scale1 = tfp.util.TransformedVariable(
   20., tfb.Exp(), dtype=tf.float64, name='length_scale')
 length_scale1 = tfp.util.TransformedVariable(
   10., tfb.Exp(), dtype=tf.float64, name='length_scale')
-# a =  tfp.util.TransformedVariable(
-#   0.5189, tfb.Exp(), dtype=tf.float64, name='a')
-# b = tfp.util.TransformedVariable(
-#   0.75, tfb.Exp(), dtype=tf.float64, name='b')
-# c = tfp.util.TransformedVariable(
-#   0.4, tfb.Exp(), dtype=tf.float64, name='c')
-# d = tfp.util.TransformedVariable(
-#   0.601, tfb.Exp(), dtype=tf.float64, name='d')
-Y = (data[::al, 1] - mean_fn(X1, X2, X3, a, b, c, d))#.reshape(-1,1)
+f = 0.64
+Y = (data[::al, 1] - mean_fn(X1, X2, X3, a, b, c, d, f))#.reshape(-1,1)
 
 
 observation_index_points = X 
