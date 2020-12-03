@@ -36,6 +36,7 @@ I slightly altered my approach to getting the parameters the process is now as f
  The BV dependence is slightly different, I am using the equation determined by Meibom et.al https://iopscience.iop.org/article/10.1088/0004-637X/695/1/679/pdf, of the form g_ (BV - h) ^f. Where the parameters are given in the paper and in my notebook. I have chosen to not let d vary; I am also unsure how to handle c at this stage. 
  - I am using a mean function of the form A_*T^c * M^d_ * (BV - d)^f_ ( here A_ is centred on A*g, A from before and g from paper). I have found that there is not too much difference in the result when I let d vary, but the plot does seem to fit best when it is not allowed to. 
  - So far, I have not been able to get as nice plots from this data. The residual plot fits well up to rotations of roughly 35 days (this data only goes up to approx. 40 days), but beyond this my GP is over predicting the rotation, not too sure why. 
+ - This could be evidence that my mean function is not optimised for this data or it COULD be evidence of the Kraft break in the data. My model does not take this into account and therefore if this is the case, over predicting is expected. 
  
  
  # to determine the values for the hyper parameters (I am unsure if this is a sensible approach...)
