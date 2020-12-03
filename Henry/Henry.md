@@ -1,14 +1,14 @@
 Here I will be keeping a rough timeline of progress for the project.
 
-11/11/2020:
+#11/11/2020:#
 Fitted GP with a mean function to generated data (predicting rotation given age and BV). Will next be looking into generating my own data set to test the process on. 
 
-12/11/2020
+#12/11/2020#
 Generated some new sample data (with a slightly different form/shape to the data guy produced) to check if my code worked on other data sets - fit very well :)
 
 --- progress made on new data set ---
 
-30/11/2020
+#30/11/2020#
 
 Given the newest data set (Mass, temperature, Rotation and Age), I have been able to make accurate predictions for the rotation period given either age or age and mass. The mean functions for both were power laws A*x^b. If the GP is given total freedom in determining the parameters, it does not work too well. Therefore, I fit rough parameters using SciPy optimize. Using these pre-determined values, I managed to get accurate predictions - tight residuals. 
 
@@ -21,7 +21,7 @@ Parameters A d and c were determined from normal functions centred on the values
 Once a few bugs were ironed out, I have been able to get a very tidy residual plot.
 
 
-03/12/2020
+#03/12/2020#
 (_ denotes a parameter I am allowing to vary in GP, no _ means it is fixed.)
 I slightly altered my approach to getting the parameters the process is now as follows:
  - fit power-law parameters to the age and rotation relation using scipy, for to get these values I only analyse the data for a small range of masses (0.9 - 0.94)
@@ -34,7 +34,7 @@ I slightly altered my approach to getting the parameters the process is now as f
  
  # in testing currently # 
  The BV dependance is slightly different, I am using the equation determined by Meibom et.al https://iopscience.iop.org/article/10.1088/0004-637X/695/1/679/pdf, of the form g_(BV - h)^f. Where the parameters are given in the paper and in my notebook. I have chosen to not let d vary, I am also unsure how to handle c at this stage. 
- - I am using a mean function of the form A_*T^c * M^d_ * (BV - d)^f_ ( here A_ is centered on A*g, A from before and g from paper).
+ - I am using a mean function of the form A_*T^c * M^d_ * (BV - d)^f_ ( here A_ is centered on A*g, A from before and g from paper). I have found that there isnt too much differnece in the result when I let d vary, but the plot does seem to fit best when it isnt allowed to. 
  - So far, I have not been able to get as nice plots from this data. The residual plot fits well up to rotations of roughly 35 days (this data only goes up to approx 40 days), but beyond this my GP is over predicting the rotation, not too sure why. 
  
  
