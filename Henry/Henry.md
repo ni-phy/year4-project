@@ -49,7 +49,8 @@ I slightly altered my approach to getting the parameters the process is now as f
 # Semester 1 recap
 As semester one comes to a close, I have made good progress on the project. I now have a reliable initial model that can accurately predict ages using generated data as the training data. Our aims for this semester were to be able to produce a model to make accurate predictions for the rotational period given mass and age. I have achieved this and taken this one step further and can include temperature (or BV) in our predictions. I have read literature on the underlying physics of gyrochronology and where Gaussian processes have been used in examples related (and not related) to astrophysics. 
 I am on track with the Gantt chart outlined in the project plan. Although I have not kept a complete log of where I am, the regular commits to the github repository and discussions made in weekly meetings, with my supervisor Guy Davies, acts as the evidence that continuous work has been made on the project. 
-Evidence of to show the accuracy of predictions made from my trained model can be found in the images directory. The figures were generated for the model where I have used Age, mass, and BV to predict rotation, the mean function used is the product of three power laws (one for each variable) where approximate values where determined by SciPy line fitting and more accurate values where determined by the Gaussian process.
+Evidence of to show the accuracy of predictions made from my trained model can be found in the i
+year4-project/Henry/good-fit-images/ under the names 3d good predictions (1&2). The figures were generated for the model where I have used Age, mass, and BV to predict rotation, the mean function used is the product of three power laws (one for each variable) where approximate values where determined by SciPy line fitting and more accurate values where determined by the Gaussian process.
 
 
 
