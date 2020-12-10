@@ -72,6 +72,13 @@ f =  0.64
 
 Y = observations = (data[::al, 1] - mean_fn(X1, X2, X3, a, b, c, d, f))
 
+amplitude = tfp.util.TransformedVariable(
+  1., tfb.Exp(), dtype=tf.float64, name='amplitude')
+length_scale = tfp.util.TransformedVariable(
+  10., tfb.Exp(), dtype=tf.float64, name='length_scale')
+observation_noise_variance = tfp.util.TransformedVariable(
+    np.exp(-5), tfb.Exp(), name='observation_noise_variance')
+
 gaussian_process_model = tfd.JointDistributionSequential([
   tfd.LogNormal(np.float64(0.), np.float64(1.)),
   tfd.LogNormal(np.float64(0.), np.float64(1.)),
