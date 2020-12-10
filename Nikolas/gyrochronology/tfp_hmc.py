@@ -72,17 +72,10 @@ f =  0.64
 
 Y = observations = (data[::al, 1] - mean_fn(X1, X2, X3, a, b, c, d, f))
 
-amplitude = tfp.util.TransformedVariable(
-  1., tfb.Exp(), dtype=tf.float64, name='amplitude')
-length_scale = tfp.util.TransformedVariable(
-  10., tfb.Exp(), dtype=tf.float64, name='length_scale')
-observation_noise_variance = tfp.util.TransformedVariable(
-    np.exp(-5), tfb.Exp(), name='observation_noise_variance')
-
 gaussian_process_model = tfd.JointDistributionSequential([
-  tfd.LogNormal(np.float64(0.), np.float64(1.)),
-  tfd.LogNormal(np.float64(0.), np.float64(1.)),
-  tfd.LogNormal(np.float64(0.), np.float64(1.)),
+  tfd.LogNormal(np.float64(1.), np.float64(1.)),
+  tfd.LogNormal(np.float64(10.), np.float64(1.)),
+  tfd.LogNormal(np.float64(1.), np.float64(1.)),
   lambda noise_variance, length_scale, amplitude: tfd.GaussianProcess(
       kernel=psd_kernels.ExponentiatedQuadratic(amplitude, length_scale),
       index_points=observation_index_points,
@@ -124,9 +117,8 @@ def run_mcmc():
 
 print("Acceptance rate: {}".format(np.mean(is_accepted)))
 
-
 gp = tfd.GaussianProcessRegressionModel(
-    kernel=kernel,
+    kernel=psd_kernels.ExponentiatedQuadratic(amplitudes[-1], length_scales[-1]),
     index_points=X_test,
     observation_index_points=observation_index_points,
     observations= observations,
@@ -165,10 +157,10 @@ plt.figure(figsize=(9,8))
 plt.hist(Z, density=True, bins=20)
 mu, sigma = 0, 1 # mean and standard deviation
 s = np.random.normal(mu, sigma, 1000)
-#count, bins, ignored = plt.hist(s, 30, density=True)
-# plt.plot(bins, 1/(sigma * np.sqrt(2 * np.pi)) *
-#                np.exp( - (bins - mu)**2 / (2 * sigma**2) ),
-#          linewidth=2, color='r', alpha=0.9)
+count, bins, ignored = plt.hist(s, 30, density=True)
+plt.plot(bins, 1/(sigma * np.sqrt(2 * np.pi)) *
+               np.exp( - (bins - mu)**2 / (2 * sigma**2) ),
+         linewidth=2, color='r', alpha=0.9)
 plt.xlabel('(Data - Prediction)/$\sigma$')
 plt.ylabel('Frequency')
 
