@@ -68,13 +68,13 @@ a = 0.5189
 b=0.75
 c=0.4
 d=0.601
-f =  0.64
+f = 0.3
 
 Y = observations = (data[::al, 1] - mean_fn(X1, X2, X3, a, b, c, d, f))
 
 gaussian_process_model = tfd.JointDistributionSequential([
-  tfd.LogNormal(np.float64(1.), np.float64(1.)),
-  tfd.LogNormal(np.float64(10.), np.float64(1.)),
+  tfd.LogNormal(np.float64(0.), np.float64(0.001)),
+  tfd.LogNormal(np.float64(30.), np.float64(5.)),
   tfd.LogNormal(np.float64(1.), np.float64(1.)),
   lambda noise_variance, length_scale, amplitude: tfd.GaussianProcess(
       kernel=psd_kernels.ExponentiatedQuadratic(amplitude, length_scale),
@@ -105,7 +105,7 @@ def run_mcmc():
       kernel=tfp.mcmc.TransformedTransitionKernel(
           inner_kernel = tfp.mcmc.HamiltonianMonteCarlo(
               target_log_prob_fn=unnormalized_log_posterior,
-              step_size=[np.float64(.15)],
+              step_size=[np.float64(.00095)],
               num_leapfrog_steps=3),
           bijector=unconstraining_bijectors),
       trace_fn=lambda _, pkr: pkr.inner_results.is_accepted)
@@ -118,11 +118,11 @@ def run_mcmc():
 print("Acceptance rate: {}".format(np.mean(is_accepted)))
 
 gp = tfd.GaussianProcessRegressionModel(
-    kernel=psd_kernels.ExponentiatedQuadratic(amplitudes[-1], length_scales[-1]),
+    kernel=psd_kernels.ExponentiatedQuadratic(np.mean(amplitudes), np.mean(length_scales)),
     index_points=X_test,
     observation_index_points=observation_index_points,
     observations= observations,
-    observation_noise_variance=observation_noise_variance)
+    observation_noise_variance=np.mean(observation_noise_variances))
 
 #print("Final NLL = {}".format(neg_log_likelihood_))
 
@@ -144,8 +144,8 @@ vals = np.sort([mu_test, sd_test], axis=1)
 print(np.mean(Y))
 
 plt.figure(figsize=(18,9))
-plt.errorbar(np.sort(data[::al, 1]), vals[0,:], yerr=vals[1,:]**0.5, fmt='bo')
-#plt.scatter(np.sort(data[::al, 1]), np.sort(mu_test-4))
+plt.fill_between(np.sort(data[::al, 1]), vals[0,:] - vals[1,:]**0.5, vals[0,:] + vals[1,:]**0.5, color='blue', alpha=0.2)
+plt.scatter(np.sort(data[::al, 1]), np.sort(mu_test-4))
 x = np.linspace(0, 40)
 plt.plot(x, x , 'r')
 plt.xlabel('Data')
