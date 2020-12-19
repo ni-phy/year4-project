@@ -14,82 +14,37 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow import keras
-from tensorflow.keras import layers
-from tensorflow.keras.layers.experimental import preprocessing
 from mpl_toolkits.mplot3d import Axes3D
 from google.colab import files
 import io
+from PyAstronomy import pyasl
+r = pyasl.BallesterosBV_T()
+b = pyasl.Ramirez2005()
 
 uploaded = files.upload()
 
 data0 = data = np.array(pd.read_csv(io.BytesIO(uploaded['Data1.csv'])))
 
+import tensorflow.math as tf_m
 def mean_fn(x, y, m, a, b, c, d, f):
-  return ((x*1000)**a * b*(y - c)**d)*m**f
-#fn from Barnes 2007 the m relation was found through trial and error
+  return ((x*1000)**a * b*(y - c)**d)*(m**f)-4 #the m relation was through trial and error
+#fn from Barnes 2007
 
-def build_and_compile_model(norm):
-  model = keras.Sequential([
-      norm,
-      layers.Dense(64, activation='relu'),
-      layers.Dense(64, activation='relu'),
-      layers.Dense(1)
-  ])
-
-  model.compile(loss='mean_absolute_error',
-                optimizer=tf.keras.optimizers.Adam(0.001))
-  return model
-data_normalizer = preprocessing.Normalization(input_shape=[1,])
-data_normalizer.adapt(data[:,3])
-dnn_model = build_and_compile_model(data_normalizer)
-history = dnn_model.fit(
-    data[:, 3], data[:,1],
-    validation_split=0.2,
-    verbose=0, epochs=100)
-x = tf.linspace(0.0, 250, 251)
-y = dnn_model.predict(x)
-
-from PyAstronomy import pyasl
-r = pyasl.BallesterosBV_T()
-b = pyasl.Ramirez2005()
-bv = []
 d0 = []
 d1 = []
 d2 = []
+d3 = []
 
 for i in range(len(data[:,3])):
-  if data[i, 3]<1.1 and data[i, 3]>1:
+  if data[i, 1]>0:
     d0.append(data[i, 0])
     d1.append(data[i, 1])
     d2.append(data[i, 2])
+    d3.append(data[i, 3])
 
-data1= np.array([d0, d1, d2]).T
-print(data1)
-for i in data1[:,0]:
-  bv.append(r.t2bv(i))
-a = 0.5189
-b=0.75
-c=0.4
-d=0.601
-x = mean_fn(data1[:,2], np.array(bv), a, b, c ,d)
-plt.scatter(data1[:,2], x, c=bv, cmap='hsv')
-plt.show()
-plt.scatter(data1[:,2], data1[:,1]-x, c=bv, cmap='hsv')
-plt.show()
+data1 = np.array([d0, d1, d2, d3]).T
 
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-fig, ax = plt.subplots()
-divider = make_axes_locatable(ax)
-cax = divider.append_axes('right', size='5%', pad=0.05)
-# plt.xlabel('Rotation(Days)')
-# plt.ylabel('Age (Gyr)')
-
-im = ax.scatter(data1[:,2], data1[:,1], c=bv, cmap='hsv')
-fig.colorbar(im, cax=cax, orientation='vertical', label='B-V')
-
-#data = data1
+data = data0
 tf.enable_v2_behavior()
 
 tfb = tfp.bijectors
@@ -97,21 +52,22 @@ tfd = tfp.distributions
 psd_kernels = tfp.math.psd_kernels
 
 # observations from a known function at some random points.
-al = 10
+al = 1
 X1 = data[::al,2] #age
 X2 = r.t2bv(data[::al,0])#data[::al,2] #B_V
 X3 = data[::al, 3]
 X = np.dstack([X1, X2, X3]).reshape(-1, 3)
 
 resolution = len(X1)
-X1_test = X1_plot = np.linspace( np.min(X1), np.max(X1), num=resolution )
-X2_test = X2_plot = np.linspace( np.min(X2), np.max(X2), num=resolution )
-X3_test = X3_plot = np.linspace( np.min(X2), np.max(X2), num=resolution )
-X_test = np.dstack([X1_test, X2_test, X3_test]).reshape(resolution, 3)
+X1_test = np.linspace( np.min(X1), np.max(X1), num=resolution )
+X2_test = np.linspace( np.min(X2), np.max(X2), num=resolution )
+X3_test = np.linspace( np.min(X3), np.max(X3), num=resolution )
+X_test = np.dstack([X1_test, X2_test, X3_test]).reshape(resolution,3)# resolution, resolution, 3)
 a = 0.5189
 b=0.75
 c=0.4
 d=0.601
+f =  0.64
 
 amplitude = tfp.util.TransformedVariable(
   1., tfb.Exp(), dtype=tf.float64, name='amplitude')
@@ -122,30 +78,33 @@ amplitude2 = tfp.util.TransformedVariable(
 length_scale = tfp.util.TransformedVariable(
   20., tfb.Exp(), dtype=tf.float64, name='length_scale')
 length_scale1 = tfp.util.TransformedVariable(
-  20., tfb.Exp(), dtype=tf.float64, name='length_scale')
-length_scale1 = tfp.util.TransformedVariable(
+  2., tfb.Exp(), dtype=tf.float64, name='length_scale')
+length_scale2 = tfp.util.TransformedVariable(
   10., tfb.Exp(), dtype=tf.float64, name='length_scale')
-f = 0.64
-Y = (data[::al, 1] - mean_fn(X1, X2, X3, a, b, c, d, f))#.reshape(-1,1)
-
+# c = tfp.util.TransformedVariable(
+#   0.4, tfb.Exp(), dtype=tf.float64, name='c')
+# d = tfp.util.TransformedVariable(
+#   0.601, tfb.Exp(), dtype=tf.float64, name='d')
+Y = observations = (data[::al, 1] - mean_fn(X1, X2, X3, a, b, c, d, f))
 
 observation_index_points = X 
-observations = Y#.T
-kernel = psd_kernels.ExponentiatedQuadratic(amplitude,
- length_scale)*psd_kernels.ExponentiatedQuadratic(amplitude1,
-  length_scale1)*psd_kernels.ExponentiatedQuadratic(amplitude2,
-  length_scale2)
+kernel = psd_kernels.ExponentiatedQuadratic(amplitude1, length_scale2)* psd_kernels.ExponentiatedQuadratic(amplitude2, length_scale1)*psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
 
 observation_noise_variance = tfp.util.TransformedVariable(
-   np.exp(1), tfb.Exp(), name='observation_noise_variance')
+   np.exp(0), tfb.Exp(), dtype=tf.float64, name='observation_noise_variance')
 
-optimizer = tf.optimizers.Adam(learning_rate=.5, beta_1=.5, beta_2=.99)
+optimizer = tf.optimizers.Adam(learning_rate=5, beta_1=.9, beta_2=.99)
 
-# trainable_variables = [v.trainable_variables[0] for v in 
-#                        [amplitude_var,
-#                        length_scale_var,
-#                        observation_noise_variance_var]]
-@tf.function
+'''
+optimizer = tf.optimizers.SGD(learning_rate=.5, momentum=0.0)
+def optimize():
+  with tf.GradientTape() as tape:
+    loss = -gp.log_prob(observations)
+  grads = tape.gradient(loss, gp.trainable_variables)
+  optimizer.minimize(loss, gp.trainable_variables)
+  #optimizer.apply_gradients(zip(grads, gp.trainable_variables))
+  return loss
+'''
 def optimize():
   with tf.GradientTape() as tape:
     loss = -gp.log_prob(observations)
@@ -157,10 +116,11 @@ gp = tfd.GaussianProcessRegressionModel(
     kernel=kernel,
     index_points=X_test,
     observation_index_points=observation_index_points,
-    observations=observations, observation_noise_variance=.1)
+    observations= observations,
+    observation_noise_variance=observation_noise_variance)
 
 #First train the model, then draw and plot posterior samples.
-for i in range(1000):
+for i in range(100):
   neg_log_likelihood_ = optimize()
   if i % 100 == 0:
     print('.')
@@ -172,61 +132,61 @@ var = np.array(gp.variance())
 # ==> 10 independently drawn, joint samples at `index_points`.
 # ==> 10 independently drawn, noisy joint samples at `index_points`
 
-fig, ax = plt.subplots()
-divider = make_axes_locatable(ax)
-cax = divider.append_axes('right', size='5%', pad=0.05)
-# plt.xlabel('Rotation(Days)')
-# plt.ylabel('Age (Gyr)')
-
-im = ax.scatter(X1_test, samples[0][0]+mean_fn(X1_test, X2_test, a, b, c ,d), cmap='hsv', c=X2_test)
-fig.colorbar(im, cax=cax, orientation='vertical', label='B-V')
-plt.show()
-
-fig = plt.figure(figsize=(18, 10))
-ax = plt.axes(projection='3d')
-ax.view_init(20, 60)
-ax.plot_surface(X1_test, X2_test, samples[0][0]+mean_fn(X1_test, X2_test, a, b, c, d), antialiased=True, alpha=0.7, linewidth=0.5, cmap='winter')
-ax.scatter3D(X1, X2, (data[::al,1]).reshape(-1,1), 
-             marker='o',edgecolors='k', color='r', s=150)
-#ax.set_zlim(0, 50)
-ax.set_xlabel('B-V Index')
-ax.set_ylabel('Rotation Period (Days)')
-ax.set_zlabel('Age (Gyr)')
-
-plt.show()
-
 numElems = len(Y)
-sample = samples[0][0]+mean_fn(X1[0], X2[0], a ,b ,c ,d)
-idx = np.round(np.linspace(0, len(np.array(sample).reshape(numElems**2)) - 1, numElems)).astype(int)
+sample = samples[0] + mean_fn(X1, X2, X3, a ,b ,c ,d, f)
+idx = np.round(np.linspace(0, len(np.array(sample).reshape(numElems)) - 1, numElems)).astype(int)
 # Picks equal spaced elements from (longer) prediction array so that its shape of data
 
-mu_test = (np.array(sample).reshape(numElems**2)[idx])
-sd_test = (np.array(var).reshape(numElems**2)[idx]) 
+mu_test = (np.array(sample).reshape(numElems)[idx])
+sd_test = (np.array(var).reshape(numElems)[idx]) 
 
 vals = np.sort([mu_test, sd_test], axis=1)
 
-print(vals.shape)
+print(np.mean(Y))
 
 plt.figure(figsize=(18,9))
-print(Y.shape, X1.shape)
-plt.errorbar(np.sort(data[::al,1]), vals[0,:], yerr=vals[1,:], fmt='bo')
-plt.scatter(np.sort(data[::al,1]), np.sort(mu_test))
-plt.plot(np.linspace( np.min(vals[0,:]), np.max(vals[0,:]), num=resolution ), 
-         np.linspace( np.min(vals[0,:]), np.max(vals[0,:]), num=resolution ), 'r')
-
+plt.errorbar(np.sort(data[::al, 1]), vals[0,:], yerr=vals[1,:]**0.5, fmt='bo')
+#plt.scatter(np.sort(data[::al, 1]), np.sort(mu_test-4))
+x = np.linspace(0, 40)
+plt.plot(x, x , 'r')
 plt.xlabel('Data')
 plt.ylabel('Prediction')
 
-Z = (np.sort(data[::al,0])-vals[0,:])/vals[1,:]
+Z = (np.sort(data[::al,1])-vals[0,:])/vals[1,:]
 print(Y.shape)
 plt.figure(figsize=(9,8))
 plt.hist(Z, density=True, bins=20)
 mu, sigma = 0, 1 # mean and standard deviation
 s = np.random.normal(mu, sigma, 1000)
-# count, bins, ignored = plt.hist(s, 30, density=True)
-# plt.plot(bins, 1/(sigma * np.sqrt(2 * np.pi)) *
-#                np.exp( - (bins - mu)**2 / (2 * sigma**2) ),
-#          linewidth=2, color='r', alpha=0.9)
+count, bins, ignored = plt.hist(s, 30, density=True)
+plt.plot(bins, 1/(sigma * np.sqrt(2 * np.pi)) *
+               np.exp( - (bins - mu)**2 / (2 * sigma**2) ),
+         linewidth=2, color='r', alpha=0.9)
 plt.xlabel('(Data - Prediction)/$\sigma$')
 plt.ylabel('Frequency')
+
+#Below is the failed attempt at mean function with DNN
+
+# from tensorflow import keras
+# from tensorflow.keras import layers
+# from tensorflow.keras.layers.experimental import preprocessing
+# def build_and_compile_model(norm):
+#   model = keras.Sequential([
+#       norm,
+#       layers.Dense(64, activation='relu'),
+#       layers.Dense(64, activation='relu'),
+#       layers.Dense(1)
+#   ])
+
+#   model.compile(loss='mean_absolute_error',
+#                 optimizer=tf.keras.optimizers.Adam(0.001))
+#   return model
+# data_normalizer = preprocessing.Normalization(input_shape=[1,])
+# data_normalizer.adapt(data[:,3])
+# dnn_model = build_and_compile_model(data_normalizer)
+# history = dnn_model.fit(X, Y,
+#     validation_split=0.2,
+#     verbose=0, epochs=100)
+# y = dnn_model.predict(X)
+# plt.plot(x,y)
 
