@@ -58,3 +58,8 @@ Evidence of to show the accuracy of predictions made from my trained model can b
 The next step in the project will be to slowly increase the realism of the generated training data. The main hurdle to overcome will be to introduce latent parameter prescription, this challenging concept is something I will first have to read into before attempting to introduce this to the current model. Once this is functional, I will be very close to being able to train my model on real data.
 
 
+# W/C 01/01/2021
+Added Gaussian noise to the data. GP still fits well; At the lower and upper ends of the range of data the GP performs quite poorly, the errors seem sensible. 
+Started to play around with Variational methods. Initial testing has found that this predicts worse and takes considerably longer than the find MAP method.
+Started to think about latent parameter models. Unsure how to implement w/r/t the task at hand.
+Preliminary research into hierarchical modelling.
