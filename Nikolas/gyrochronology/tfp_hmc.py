@@ -9,7 +9,10 @@ Original file is located at
 
 pip install pyAstronomy
 
+pip install arviz
+
 import numpy as np
+import arviz as az
 import pandas as pd
 import matplotlib.pyplot as plt
 import tensorflow.compat.v2 as tf
@@ -27,9 +30,31 @@ data0 = data = np.array(pd.read_csv(io.BytesIO(uploaded['Data1.csv'])))
 
 import tensorflow.math as tf_m
 def mean_fn(x, y, m, a, b, c, d, f):
-  return ((x*1000)**a * b*(y - c)**d)*(m**f)-4 #the m relation was through trial and error
+  return ((x*1000)**a * b*(y - c)**d)*(m**f) #the m relation was through trial and error
 #fn from Barnes 2007
 
+data_r = []
+for num in range(0, len(data0)):
+  if np.random.random_sample()< 0.050:
+    data_r.append(data0[num])
+data_r = np.array(data_r)
+print(len(data_r))
+
+d0 = []
+d1 = []
+d2 = []
+d3 = []
+
+for i in range(len(data[:,3])):
+  if data[i, 1]>0:
+    d0.append(data[i, 0])
+    d1.append(data[i, 1])
+    d2.append(data[i, 2])
+    d3.append(data[i, 3])
+
+data1 = np.array([d0, d1, d2, d3]).T
+
+data = data_r
 tf.enable_v2_behavior()
 
 
@@ -38,9 +63,9 @@ tfd = tfp.distributions
 psd_kernels = tfp.math.psd_kernels
 
 # observations from a known function at some random points.
-al = 10
+al = 2
 X1 = data[::al,2] #age
-X2 = r.t2bv(data[::al,0]) #B_V
+X2 = r.t2bv(data[::al,0])#data[::al,2] #B_V
 X3 = data[::al, 3]
 observation_index_points = np.dstack([X1, X2, X3]).reshape(-1, 3)
 
@@ -53,11 +78,18 @@ a = 0.5189
 b=0.75
 c=0.4
 d=0.601
-f = 0.3
+f = 0.3# 0.64
 
 Y = observations = (data[::al, 1] - mean_fn(X1, X2, X3, a, b, c, d, f))
 
-#Introducing the model with parameters drawn from a Normal Dist
+# amplitude = tfp.util.TransformedVariable(
+#   10., tfb.Exp(), dtype=tf.float64, name='amplitude')
+# length_scale = tfp.util.TransformedVariable(
+#   10., tfb.Exp(), dtype=tf.float64, name='length_scale')
+# kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
+# observation_noise_variance = tfp.util.TransformedVariable(
+#     np.exp(-5), tfb.Exp(), name='observation_noise_variance')
+
 gaussian_process_model = tfd.JointDistributionSequential([
   tfd.LogNormal(np.float64(0.), np.float64(0.001)),
   tfd.LogNormal(np.float64(30.), np.float64(5.)),
@@ -67,7 +99,6 @@ gaussian_process_model = tfd.JointDistributionSequential([
       index_points=observation_index_points,
       observation_noise_variance=noise_variance)])
 
-#Intorducing the initial states
 initial_chain_states = [
     1e0 * tf.ones([], dtype=np.float64, name='init_amplitude'),
     30 * tf.ones([], dtype=np.float64, name='init_length_scale'),
@@ -79,10 +110,9 @@ unconstraining_bijectors = [
     tfp.bijectors.Softplus(),]
 
 def unnormalized_log_posterior(*args):
-  #Returns log posterio used in the HMC
   return gaussian_process_model.log_prob(*args, x=observations)
 
-num_results = 200 #The number of results this is steps-burn in-leapfrog 
+num_results = 1000
 @tf.function
 def run_mcmc():
   return tfp.mcmc.sample_chain(
@@ -104,7 +134,7 @@ def run_mcmc():
 ], is_accepted = run_mcmc()
 
 print("Acceptance rate: {}".format(np.mean(is_accepted)))
-#After the results are returned, used their mean as model's parameters
+
 gp = tfd.GaussianProcessRegressionModel(
     kernel=psd_kernels.ExponentiatedQuadratic(np.mean(amplitudes), np.mean(length_scales)),
     index_points=X_test,
@@ -119,6 +149,23 @@ var = np.array(gp.variance())
 # ==> 10 independently drawn, joint samples at `index_points`.
 # ==> 10 independently drawn, noisy joint samples at `index_points`
 
+acf = tfp.stats.auto_correlation(
+    amplitudes, axis=-1, max_lags=None, center=True, normalize=True,
+    name='auto_correlation'
+)
+
+#count_acf, bins_acf, ignored_acf = plt.hist(abs(acf), 100, density=False)
+plt.scatter(acf, np.arange(0, len(acf)))
+
+var1 = np.array([amplitudes,
+      length_scales,
+      observation_noise_variances])
+az.plot_autocorr(var1)
+'''
+, var_names=("amplitudes",
+      "length_scales",
+      "observation_noise_variances"))'''
+
 numElems = len(Y)
 sample = samples[0] + mean_fn(X1, X2, X3, a ,b ,c ,d, f)
 idx = np.round(np.linspace(0, len(np.array(sample).reshape(numElems)) - 1, numElems)).astype(int)
@@ -130,22 +177,24 @@ sd_test = (np.array(var).reshape(numElems)[idx])
 vals = np.sort([mu_test, sd_test], axis=1)
 
 print(np.mean(Y))
-#ploting residuals
+print(np.mean(observation_noise_variances))
+
 plt.figure(figsize=(18,9))
+#plt.errorbar(np.sort(data[::al, 1]), vals[0,:], yerr=vals[1,:]**0.5, fmt='bo')
 plt.fill_between(np.sort(data[::al, 1]), vals[0,:] - vals[1,:]**0.5, vals[0,:] + vals[1,:]**0.5, color='blue', alpha=0.2)
-plt.scatter(np.sort(data[::al, 1]), np.sort(mu_test-4))
+plt.scatter(np.sort(data[::al, 1]), np.sort(mu_test))
 x = np.linspace(0, 40)
 plt.plot(x, x , 'r')
 plt.xlabel('Data')
 plt.ylabel('Prediction')
-#Plotting z-statistic
-Z = (np.sort(data[::al,1])-vals[0,:])/vals[1,:]
+
+Z = (np.sort(data[::al,1])-vals[0,:])/vals[1,:]**0.01
 print(Y.shape)
 plt.figure(figsize=(9,8))
 plt.hist(Z, density=True, bins=20)
 mu, sigma = 0, 1 # mean and standard deviation
 s = np.random.normal(mu, sigma, 1000)
-count, bins, ignored = plt.hist(s, 30, density=True)
+count, bins, ignored = plt.hist(s, 30, density=True, alpha=0.5)
 plt.plot(bins, 1/(sigma * np.sqrt(2 * np.pi)) *
                np.exp( - (bins - mu)**2 / (2 * sigma**2) ),
          linewidth=2, color='r', alpha=0.9)
