@@ -35,7 +35,7 @@ def mean_fn(x, y, m, a, b, c, d, f):
 
 data_r = []
 for num in range(0, len(data0)):
-  if np.random.random_sample()< 0.050:
+  if np.random.random_sample()< 0.1:
     data_r.append(data0[num])
 data_r = np.array(data_r)
 print(len(data_r))
@@ -69,11 +69,12 @@ X2 = r.t2bv(data[::al,0])#data[::al,2] #B_V
 X3 = data[::al, 3]
 observation_index_points = np.dstack([X1, X2, X3]).reshape(-1, 3)
 
-resolution = len(X1)
+resolution = len(X2)
 X1_test = np.linspace( np.min(X1), np.max(X1), num=resolution )
 X2_test = np.linspace( np.min(X2), np.max(X2), num=resolution )
 X3_test = np.linspace( np.min(X3), np.max(X3), num=resolution )
 X_test = np.dstack([X1_test, X2_test, X3_test]).reshape(resolution,3)# resolution, resolution, 3)
+
 a = 0.5189
 b=0.75
 c=0.4
@@ -81,7 +82,7 @@ d=0.601
 f = 0.3# 0.64
 
 Y = observations = (data[::al, 1] - mean_fn(X1, X2, X3, a, b, c, d, f))
-
+#observations_ = tf.convert_to_tensor(X1, dtype=np.float64, name='observations_')
 # amplitude = tfp.util.TransformedVariable(
 #   10., tfb.Exp(), dtype=tf.float64, name='amplitude')
 # length_scale = tfp.util.TransformedVariable(
@@ -94,30 +95,33 @@ gaussian_process_model = tfd.JointDistributionSequential([
   tfd.LogNormal(np.float64(0.), np.float64(0.001)),
   tfd.LogNormal(np.float64(30.), np.float64(5.)),
   tfd.LogNormal(np.float64(1.), np.float64(1.)),
-  lambda noise_variance, length_scale, amplitude: tfd.GaussianProcess(
+  tfd.LogNormal(X1.reshape(-1), 0.2*X1.reshape(-1)),
+  lambda noise_variance, length_scale, amplitude, observations_: tfd.GaussianProcess(
       kernel=psd_kernels.ExponentiatedQuadratic(amplitude, length_scale),
       index_points=observation_index_points,
       observation_noise_variance=noise_variance)])
 
 initial_chain_states = [
-    1e0 * tf.ones([], dtype=np.float64, name='init_amplitude'),
-    30 * tf.ones([], dtype=np.float64, name='init_length_scale'),
-    1e-2 * tf.ones([], dtype=np.float64, name='init_obs_noise_variance')]
+    1e0 * tf.ones([len(X1)], dtype=np.float64, name='init_amplitude'),
+    30 * tf.ones([len(X1)], dtype=np.float64, name='init_length_scale'),
+    1e-2 * tf.ones([len(X1)], dtype=np.float64, name='init_obs_noise_variance'),
+    tf.convert_to_tensor(X1.reshape(-1), dtype=np.float64, name='observations_')]
 
 unconstraining_bijectors = [
     tfp.bijectors.Softplus(),
     tfp.bijectors.Softplus(),
-    tfp.bijectors.Softplus(),]
+    tfp.bijectors.Softplus(),
+    tfp.bijectors.Softplus()]
 
 def unnormalized_log_posterior(*args):
   return gaussian_process_model.log_prob(*args, x=observations)
 
-num_results = 1000
+num_results = 500
 @tf.function
 def run_mcmc():
   return tfp.mcmc.sample_chain(
       num_results=num_results,
-      num_burnin_steps=500,
+      num_burnin_steps=50,
       num_steps_between_results=3,
       current_state=initial_chain_states,
       kernel=tfp.mcmc.TransformedTransitionKernel(
@@ -130,10 +134,13 @@ def run_mcmc():
 [
       amplitudes,
       length_scales,
-      observation_noise_variances
+      observation_noise_variances,
+      observations_
 ], is_accepted = run_mcmc()
 
 print("Acceptance rate: {}".format(np.mean(is_accepted)))
+print(observations_.numpy()[0])
+observation_index_points = np.dstack([observations_.numpy()[0], X2, X3]).reshape(-1, 3)
 
 gp = tfd.GaussianProcessRegressionModel(
     kernel=psd_kernels.ExponentiatedQuadratic(np.mean(amplitudes), np.mean(length_scales)),
@@ -149,13 +156,12 @@ var = np.array(gp.variance())
 # ==> 10 independently drawn, joint samples at `index_points`.
 # ==> 10 independently drawn, noisy joint samples at `index_points`
 
+(observations_.numpy()[0] - X1)
+
 acf = tfp.stats.auto_correlation(
     amplitudes, axis=-1, max_lags=None, center=True, normalize=True,
     name='auto_correlation'
 )
-
-#count_acf, bins_acf, ignored_acf = plt.hist(abs(acf), 100, density=False)
-plt.scatter(acf, np.arange(0, len(acf)))
 
 var1 = np.array([amplitudes,
       length_scales,
@@ -181,7 +187,7 @@ print(np.mean(observation_noise_variances))
 
 plt.figure(figsize=(18,9))
 #plt.errorbar(np.sort(data[::al, 1]), vals[0,:], yerr=vals[1,:]**0.5, fmt='bo')
-plt.fill_between(np.sort(data[::al, 1]), vals[0,:] - vals[1,:]**0.5, vals[0,:] + vals[1,:]**0.5, color='blue', alpha=0.2)
+plt.fill_between(np.sort(data[::al, 1]), vals[0,:] - 20*vals[1,:]**0.5, vals[0,:] + 20*vals[1,:]**0.5, color='blue', alpha=0.2)
 plt.scatter(np.sort(data[::al, 1]), np.sort(mu_test))
 x = np.linspace(0, 40)
 plt.plot(x, x , 'r')
