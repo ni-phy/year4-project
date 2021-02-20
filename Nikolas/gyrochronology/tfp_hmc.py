@@ -21,6 +21,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from google.colab import files
 import io
 from PyAstronomy import pyasl
+import time
 r = pyasl.BallesterosBV_T()
 b = pyasl.Ramirez2005()
 
@@ -30,12 +31,29 @@ data0 = data = np.array(pd.read_csv(io.BytesIO(uploaded['Data1.csv'])))
 
 import tensorflow.math as tf_m
 def mean_fn(x, y, m, a, b, c, d, f):
-  return ((x*1000)**a * b*(y - c)**d)*(m**f) #the m relation was through trial and error
+  return (np.exp(x)*1000)**a * b*(y - c)**d #the m relation was through trial and error
 #fn from Barnes 2007
+
+data = data0
+a = 0.5189
+b=0.75
+c=0.4
+d=0.601
+f = -0.6
+X1 = np.log(data[:,2]) #age
+X2 = r.t2bv(data[:,0])#data[::al,2] #B_V
+X3 = data[:, 3] #mass
+x = mean_fn(X1, X2, X3, a, b, c, d, f)
+plt.scatter(X3, x, c=X2, cmap='hsv')
+plt.show()
+plt.scatter(X3, data[:,1], c=X2, cmap='hsv')
+subtract = data[:,1]-x
+plt.show()
+plt.scatter(X3, subtract, c=data[:,2], cmap='hsv')
 
 data_r = []
 for num in range(0, len(data0)):
-  if np.random.random_sample()< 0.5:
+  if np.random.random_sample()< 0.1:
     data_r.append(data0[num])
 data_r = np.array(data_r)
 print(len(data_r))
@@ -56,7 +74,7 @@ data1 = np.array([d0, d1, d2, d3]).T
 
 data = data_r
 tf.enable_v2_behavior()
-
+t1 = time.perf_counter()
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -64,13 +82,13 @@ psd_kernels = tfp.math.psd_kernels
 
 # observations from a known function at some random points.
 al = 2
-X1 = data[::al,2] #age
+X1 = np.log(data[::al,2]) #age
 X2 = r.t2bv(data[::al,0])#data[::al,2] #B_V
 X3 = data[::al, 3]
 observation_index_points = np.dstack([X1, X2, X3]).reshape(-1, 3)
 
 resolution = len(X2)
-X1_test = np.linspace( np.min(X1), np.max(X1), num=resolution )
+X1_test = np.log(np.linspace( np.min(data[::al,2]), np.max(data[::al,2]), num=resolution ))
 X2_test = np.linspace( np.min(X2), np.max(X2), num=resolution )
 X3_test = np.linspace( np.min(X3), np.max(X3), num=resolution )
 X_test = np.dstack([X1_test, X2_test, X3_test]).reshape(resolution,3)# resolution, resolution, 3)
@@ -82,29 +100,21 @@ d=0.601
 f = 0.3# 0.64
 
 Y = observations = (data[::al, 1] - mean_fn(X1, X2, X3, a, b, c, d, f))
-#observations_ = tf.convert_to_tensor(X1, dtype=np.float64, name='observations_')
-# amplitude = tfp.util.TransformedVariable(
-#   10., tfb.Exp(), dtype=tf.float64, name='amplitude')
-# length_scale = tfp.util.TransformedVariable(
-#   10., tfb.Exp(), dtype=tf.float64, name='length_scale')
-# kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
-# observation_noise_variance = tfp.util.TransformedVariable(
-#     np.exp(-5), tfb.Exp(), name='observation_noise_variance')
+noise_variance = 0.2*data[::al, 1]
 
 gaussian_process_model = tfd.JointDistributionSequential([
   tfd.LogNormal(np.float64(0.), np.float64(0.001)),
-  tfd.LogNormal(np.float64(30.), np.float64(5.)),
-  tfd.Normal(X1.reshape(-1), 0.2*X1.reshape(-1)),
+  tfd.LogNormal(np.float64(30.), np.float64(.01)),
+  tfd.LogNormal(X1.reshape(-1), 0.43*0.2*X1.reshape(-1)),
   tfd.Normal(X2.reshape(-1), 0.04*X1.reshape(-1)),
   tfd.Normal(X3.reshape(-1), 0.04*X1.reshape(-1)),
   lambda length_scale, amplitude, observations1_, observations2_, observations3_: tfd.GaussianProcess(
       kernel=psd_kernels.ExponentiatedQuadratic(amplitude, length_scale),
-      index_points=observation_index_points,
-      observation_noise_variance=2)])
+      index_points=observation_index_points, observation_noise_variance=noise_variance)])
 
 initial_chain_states = [
-    1e0 * tf.ones([len(X1)], dtype=np.float64, name='init_amplitude'),
-    30 * tf.ones([len(X1)], dtype=np.float64, name='init_length_scale'),
+    1 * tf.ones([len(X1)], dtype=np.float64, name='init_amplitude'),
+    3 * tf.ones([len(X1)], dtype=np.float64, name='init_length_scale'),
     tf.convert_to_tensor(X1.reshape(-1), dtype=np.float64, name='observations1_'),
     tf.convert_to_tensor(X2.reshape(-1), dtype=np.float64, name='observations2_'),
     tf.convert_to_tensor(X3.reshape(-1), dtype=np.float64, name='observations3_')]
@@ -119,20 +129,21 @@ unconstraining_bijectors = [
 def unnormalized_log_posterior(*args):
   return gaussian_process_model.log_prob(*args, x=observations)
 
-num_results = 500
+num_results = 1000
+num_burnin_steps = 10000
 @tf.function
 def run_mcmc():
   return tfp.mcmc.sample_chain(
       num_results=num_results,
-      num_burnin_steps=500,
-      num_steps_between_results=3,
+      num_burnin_steps=num_burnin_steps,
+      num_steps_between_results=10,
       current_state=initial_chain_states,
-      kernel=tfp.mcmc.TransformedTransitionKernel(
+      kernel=tfp.mcmc.SimpleStepSizeAdaptation(
           inner_kernel = tfp.mcmc.HamiltonianMonteCarlo(
               target_log_prob_fn=unnormalized_log_posterior,
-              step_size=[np.float64(.00095)],
-              num_leapfrog_steps=3),
-          bijector=unconstraining_bijectors),
+              step_size=[np.float64(1)],
+              num_leapfrog_steps=3), 
+              num_adaptation_steps=int(num_burnin_steps * 0.9)),
       trace_fn=lambda _, pkr: pkr.inner_results.is_accepted)
 [
       amplitudes,
@@ -141,8 +152,8 @@ def run_mcmc():
       observations2_, observations3_
 ], is_accepted = run_mcmc()
 
+
 print("Acceptance rate: {}".format(np.mean(is_accepted)))
-print(observations_.numpy()[0])
 observation_index_points = np.dstack([observations1_.numpy()[0], observations2_.numpy()[0], observations3_.numpy()[0]]).reshape(-1,3)
 
 gp = tfd.GaussianProcessRegressionModel(
@@ -150,7 +161,7 @@ gp = tfd.GaussianProcessRegressionModel(
     index_points=X_test,
     observation_index_points=observation_index_points,
     observations= observations,
-    observation_noise_variance=2)
+    observation_noise_variance=noise_variance)
 
 #print("Final NLL = {}".format(neg_log_likelihood_))
 
@@ -158,6 +169,8 @@ samples = gp.sample(10).numpy()
 var = np.array(gp.variance())
 # ==> 10 independently drawn, joint samples at `index_points`.
 # ==> 10 independently drawn, noisy joint samples at `index_points`
+t2 = time.perf_counter()
+print()
 
 acf = tfp.stats.auto_correlation(
     amplitudes, axis=-1, max_lags=None, center=True, normalize=True,
@@ -174,16 +187,15 @@ az.plot_autocorr(var1)
 
 numElems = len(Y)
 sample = samples[0] + mean_fn(X1, X2, X3, a ,b ,c ,d, f)
-idx = np.round(np.linspace(0, len(np.array(sample).reshape(numElems)) - 1, numElems)).astype(int)
+idx = np.round(np.linspace(0, len(np.array(sample).reshape(numElems**2)) - 1, numElems)).astype(int)
 # Picks equal spaced elements from (longer) prediction array so that its shape of data
 
-mu_test = (np.array(sample).reshape(numElems)[idx])
-sd_test = (np.array(var).reshape(numElems)[idx]) 
+mu_test = (np.array(sample).reshape(numElems**2)[idx])
+sd_test = (np.array(var).reshape(numElems**2)[idx]) 
 
 vals = np.sort([mu_test, sd_test], axis=1)
 
 print(np.mean(Y))
-print(np.mean(observation_noise_variances))
 
 plt.figure(figsize=(18,9))
 #plt.errorbar(np.sort(data[::al, 1]), vals[0,:], yerr=vals[1,:]**0.5, fmt='bo')
@@ -207,3 +219,31 @@ plt.plot(bins, 1/(sigma * np.sqrt(2 * np.pi)) *
 plt.xlabel('(Data - Prediction)/$\sigma$')
 plt.ylabel('Frequency')
 
+import collections 
+PooledModel = collections.namedtuple('PooledModel', ['A', 'LS'])
+samples = [
+      amplitudes,
+      length_scales
+]
+pooled_samples = PooledModel._make(samples)
+
+for var, var_samples in pooled_samples._asdict().items():
+  print('R-hat for ', var, ':\t',
+        tfp.mcmc.potential_scale_reduction(var_samples).numpy())
+
+import seaborn as sns
+def plot_traces(var_name, samples, num_chains):
+  if isinstance(samples, tf.Tensor):
+    samples = samples.numpy() # convert to numpy array
+  fig, axes = plt.subplots(1, 2, figsize=(14, 1.5), sharex='col', sharey='col')
+  for chain in range(num_chains):
+    axes[0].plot(samples[:, chain], alpha=0.7)
+    axes[0].title.set_text("'{}' trace".format(var_name))
+    sns.kdeplot(samples[:, chain], ax=axes[1], shade=False)
+    axes[1].title.set_text("'{}' distribution".format(var_name))
+    axes[0].set_xlabel('Iteration')
+    axes[1].set_xlabel(var_name)
+  plt.show()
+
+for var, var_samples in pooled_samples._asdict().items():
+  plot_traces(var, samples=var_samples, num_chains=4)
