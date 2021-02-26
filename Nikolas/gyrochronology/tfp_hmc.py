@@ -104,11 +104,11 @@ noise_variance = 0.2*data[::al, 1]
 
 gaussian_process_model = tfd.JointDistributionSequential([
   tfd.LogNormal(np.float64(0.), np.float64(0.001)),
-  tfd.LogNormal(np.float64(30.), np.float64(.01)),
+  tfd.LogNormal(np.float64(3.), np.float64(.01)),
   tfd.LogNormal(X1.reshape(-1), 0.43*0.2*X1.reshape(-1)),
   tfd.Normal(X2.reshape(-1), 0.04*X1.reshape(-1)),
   tfd.Normal(X3.reshape(-1), 0.04*X1.reshape(-1)),
-  lambda length_scale, amplitude, observations1_, observations2_, observations3_: tfd.GaussianProcess(
+  lambda amplitude, length_scale, observations1_, observations2_, observations3_: tfd.GaussianProcess(
       kernel=psd_kernels.ExponentiatedQuadratic(amplitude, length_scale),
       index_points=observation_index_points, observation_noise_variance=noise_variance)])
 
@@ -206,7 +206,7 @@ plt.plot(x, x , 'r')
 plt.xlabel('Data')
 plt.ylabel('Prediction')
 
-Z = (np.sort(data[::al,1])-vals[0,:])/vals[1,:]**0.01
+Z = (np.sort(data[::al,1])-vals[0,:])/vals[1,:]**2
 print(Y.shape)
 plt.figure(figsize=(9,8))
 plt.hist(Z, density=True, bins=20)
