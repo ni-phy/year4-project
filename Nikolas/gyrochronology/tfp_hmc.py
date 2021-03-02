@@ -31,7 +31,7 @@ data0 = data = np.array(pd.read_csv(io.BytesIO(uploaded['Data1.csv'])))
 
 import tensorflow.math as tf_m
 def mean_fn(x, y, m, a, b, c, d, f):
-  return (np.exp(x)*1000)**a * b*(y - c)**d #the m relation was through trial and error
+  return (np.exp(x)*1000)**a * b*(y - c)**d#the m relation was through trial and error
 #fn from Barnes 2007
 
 data = data0
@@ -49,11 +49,18 @@ plt.show()
 plt.scatter(X3, data[:,1], c=X2, cmap='hsv')
 subtract = data[:,1]-x
 plt.show()
-plt.scatter(X3, subtract, c=data[:,2], cmap='hsv')
+fig = plt.figure(figsize=(12, 8))
+plt.scatter(X1, subtract, c=data[:,2], cmap='hsv')
+plt.xlabel('Age', size=15)
+plt.ylabel('Rotation', size=15)
+#plt.subplots_adjust(bottom=np.min(X2), top=np.max(X2))
+cax = plt.axes([0.95, 0.1, 0.075, 0.8])
+plt.colorbar(cax=cax, label='B-V')
+plt.show()
 
 data_r = []
 for num in range(0, len(data0)):
-  if np.random.random_sample()< 0.1:
+  if np.random.random_sample()< 0.4:
     data_r.append(data0[num])
 data_r = np.array(data_r)
 print(len(data_r))
@@ -100,10 +107,10 @@ d=0.601
 f = 0.3# 0.64
 
 Y = observations = (data[::al, 1] - mean_fn(X1, X2, X3, a, b, c, d, f))
-noise_variance = 0.2*data[::al, 1]
+noise_variance = 0.01*data[::al, 1]
 
 gaussian_process_model = tfd.JointDistributionSequential([
-  tfd.LogNormal(np.float64(0.), np.float64(0.001)),
+  tfd.LogNormal(np.float64(0.), np.float64(.001)),
   tfd.LogNormal(np.float64(3.), np.float64(.01)),
   tfd.LogNormal(X1.reshape(-1), 0.43*0.2*X1.reshape(-1)),
   tfd.Normal(X2.reshape(-1), 0.04*X1.reshape(-1)),
@@ -129,8 +136,8 @@ unconstraining_bijectors = [
 def unnormalized_log_posterior(*args):
   return gaussian_process_model.log_prob(*args, x=observations)
 
-num_results = 1000
-num_burnin_steps = 10000
+num_results = 500
+num_burnin_steps = 1000
 @tf.function
 def run_mcmc():
   return tfp.mcmc.sample_chain(
@@ -141,9 +148,9 @@ def run_mcmc():
       kernel=tfp.mcmc.SimpleStepSizeAdaptation(
           inner_kernel = tfp.mcmc.HamiltonianMonteCarlo(
               target_log_prob_fn=unnormalized_log_posterior,
-              step_size=[np.float64(1)],
+              step_size=[np.float64(1e-6)],
               num_leapfrog_steps=3), 
-              num_adaptation_steps=int(num_burnin_steps * 0.9)),
+              num_adaptation_steps=int(num_burnin_steps)),
       trace_fn=lambda _, pkr: pkr.inner_results.is_accepted)
 [
       amplitudes,
@@ -220,7 +227,7 @@ plt.xlabel('(Data - Prediction)/$\sigma$')
 plt.ylabel('Frequency')
 
 import collections 
-PooledModel = collections.namedtuple('PooledModel', ['A', 'LS'])
+PooledModel = collections.namedtuple('PooledModel', ['Amplitude', 'Length_Scale'])
 samples = [
       amplitudes,
       length_scales
