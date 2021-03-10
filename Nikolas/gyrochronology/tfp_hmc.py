@@ -27,14 +27,32 @@ b = pyasl.Ramirez2005()
 
 uploaded = files.upload()
 
-data0 = data = np.array(pd.read_csv(io.BytesIO(uploaded['Data1.csv'])))
+data0 = data = np.array(pd.read_csv(io.BytesIO(uploaded['SItable1.csv'])))
 
 import tensorflow.math as tf_m
-def mean_fn(x, y, m, a, b, c, d, f):
-  return (np.exp(x)*1000)**a * b*(y - c)**d#the m relation was through trial and error
+def mean_fn(x, y, a, b, c, d):
+  return (np.exp(x)*1000)**a * b*(y - c)**d #the m relation was through trial and error
 #fn from Barnes 2007
 
-data = data0
+pd.read_csv(io.BytesIO(uploaded['SItable1.csv']))
+#tolist makes array to list to remove 'dtype=float64' from the end of the array
+te = data0[:,2].tolist()
+tee= data0[:,3].tolist()
+age = data0[:,4].tolist()
+agle = data0[:,5].tolist()
+ague = data0[:,6].tolist()
+mass = data0[:,7].tolist()
+massle = data0[:,8].tolist()
+massue = data0[:,9].tolist()
+p = data0[:,21].tolist()
+pl = data0[:,22].tolist()
+pu = data0[:,23].tolist()
+
+mass_error = np.log(mass)-np.log(np.array(mass) - np.array(massle))
+age_error = np.log(age) - np.log(np.array(age) - np.array(agle))
+p_error = np.log(p) - np.log(np.array(p)-np.array(pl))
+
+data = np.array([te, p, age, mass]).T
 a = 0.5189
 b=0.75
 c=0.4
@@ -43,7 +61,7 @@ f = -0.6
 X1 = np.log(data[:,2]) #age
 X2 = r.t2bv(data[:,0])#data[::al,2] #B_V
 X3 = data[:, 3] #mass
-x = mean_fn(X1, X2, X3, a, b, c, d, f)
+x = mean_fn(X1, X2, a, b, c, d)
 plt.scatter(X3, x, c=X2, cmap='hsv')
 plt.show()
 plt.scatter(X3, data[:,1], c=X2, cmap='hsv')
@@ -79,7 +97,6 @@ for i in range(len(data[:,3])):
 
 data1 = np.array([d0, d1, d2, d3]).T
 
-data = data_r
 tf.enable_v2_behavior()
 t1 = time.perf_counter()
 
@@ -88,14 +105,13 @@ tfd = tfp.distributions
 psd_kernels = tfp.math.psd_kernels
 
 # observations from a known function at some random points.
-al = 2
-X1 = np.log(data[::al,2]) #age
-X2 = r.t2bv(data[::al,0])#data[::al,2] #B_V
-X3 = data[::al, 3]
+X1 = np.log(age) #age
+X2 = r.t2bv(np.array(te))#data[::al,2] #B_V
+X3 = np.array(mass)
 observation_index_points = np.dstack([X1, X2, X3]).reshape(-1, 3)
 
 resolution = len(X2)
-X1_test = np.log(np.linspace( np.min(data[::al,2]), np.max(data[::al,2]), num=resolution ))
+X1_test = np.log(np.linspace( np.min(data[::,2]), np.max(data[::,2]), num=resolution ))
 X2_test = np.linspace( np.min(X2), np.max(X2), num=resolution )
 X3_test = np.linspace( np.min(X3), np.max(X3), num=resolution )
 X_test = np.dstack([X1_test, X2_test, X3_test]).reshape(resolution,3)# resolution, resolution, 3)
@@ -104,17 +120,16 @@ a = 0.5189
 b=0.75
 c=0.4
 d=0.601
-f = 0.3# 0.64
 
-Y = observations = (data[::al, 1] - mean_fn(X1, X2, X3, a, b, c, d, f))
-noise_variance = 0.01*data[::al, 1]
+Y = observations = (np.array(p) - mean_fn(X1, X2, a, b, c, d))
+noise_variance = p_error
 
 gaussian_process_model = tfd.JointDistributionSequential([
-  tfd.LogNormal(np.float64(0.), np.float64(.001)),
-  tfd.LogNormal(np.float64(3.), np.float64(.01)),
-  tfd.LogNormal(X1.reshape(-1), 0.43*0.2*X1.reshape(-1)),
-  tfd.Normal(X2.reshape(-1), 0.04*X1.reshape(-1)),
-  tfd.Normal(X3.reshape(-1), 0.04*X1.reshape(-1)),
+  tfd.LogNormal(np.float64(0.), np.float64(.01)),
+  tfd.LogNormal(np.float64(0.), np.float64(.01)),
+  tfd.LogNormal(X1.reshape(-1), np.array(age_error)/np.array(age).reshape(-1)),
+  tfd.Normal(X2.reshape(-1), (3/2)*(5601**-1.5)*(np.array(tee)/np.array(te)).reshape(-1)),
+  tfd.Normal(X3.reshape(-1), np.array(mass_error).reshape(-1)),
   lambda amplitude, length_scale, observations1_, observations2_, observations3_: tfd.GaussianProcess(
       kernel=psd_kernels.ExponentiatedQuadratic(amplitude, length_scale),
       index_points=observation_index_points, observation_noise_variance=noise_variance)])
@@ -137,7 +152,7 @@ def unnormalized_log_posterior(*args):
   return gaussian_process_model.log_prob(*args, x=observations)
 
 num_results = 500
-num_burnin_steps = 1000
+num_burnin_steps = 60000
 @tf.function
 def run_mcmc():
   return tfp.mcmc.sample_chain(
@@ -162,6 +177,7 @@ def run_mcmc():
 
 print("Acceptance rate: {}".format(np.mean(is_accepted)))
 observation_index_points = np.dstack([observations1_.numpy()[0], observations2_.numpy()[0], observations3_.numpy()[0]]).reshape(-1,3)
+Y = observations = np.array(p) - mean_fn(observation_index_points[:,0], observation_index_points[:,1], a, b, c, d)
 
 gp = tfd.GaussianProcessRegressionModel(
     kernel=psd_kernels.ExponentiatedQuadratic(np.mean(amplitudes), np.mean(length_scales)),
@@ -184,6 +200,8 @@ acf = tfp.stats.auto_correlation(
     name='auto_correlation'
 )
 
+(observation_index_points[:,1]-X2)/X2
+
 var1 = np.array([amplitudes,
       length_scales])
 az.plot_autocorr(var1)
@@ -193,7 +211,7 @@ az.plot_autocorr(var1)
       "observation_noise_variances"))'''
 
 numElems = len(Y)
-sample = samples[0] + mean_fn(X1, X2, X3, a ,b ,c ,d, f)
+sample = samples[0] + mean_fn(X1, X2, a ,b ,c ,d)
 idx = np.round(np.linspace(0, len(np.array(sample).reshape(numElems**2)) - 1, numElems)).astype(int)
 # Picks equal spaced elements from (longer) prediction array so that its shape of data
 
@@ -205,15 +223,15 @@ vals = np.sort([mu_test, sd_test], axis=1)
 print(np.mean(Y))
 
 plt.figure(figsize=(18,9))
-#plt.errorbar(np.sort(data[::al, 1]), vals[0,:], yerr=vals[1,:]**0.5, fmt='bo')
-plt.fill_between(np.sort(data[::al, 1]), vals[0,:] - vals[1,:]**0.5, vals[0,:] + vals[1,:]**0.5, color='blue', alpha=0.2)
-plt.scatter(np.sort(data[::al, 1]), np.sort(mu_test))
-x = np.linspace(0, 40)
+plt.errorbar(np.sort(data[::, 1]), vals[0,:], yerr=vals[1,:]**0.5, fmt='bo')
+plt.fill_between(np.sort(data[::, 1]), vals[0,:] - vals[1,:]**0.5, vals[0,:] + vals[1,:]**0.5, color='blue', alpha=0.2)
+plt.scatter(np.sort(data[::, 1]), np.sort(mu_test))
+x = np.linspace(0, 50)
 plt.plot(x, x , 'r')
 plt.xlabel('Data')
 plt.ylabel('Prediction')
 
-Z = (np.sort(data[::al,1])-vals[0,:])/vals[1,:]**2
+Z = (np.sort(data[::,1])-vals[0,:])/vals[1,:]**2
 print(Y.shape)
 plt.figure(figsize=(9,8))
 plt.hist(Z, density=True, bins=20)
