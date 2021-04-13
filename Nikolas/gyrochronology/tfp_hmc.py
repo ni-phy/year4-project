@@ -125,12 +125,21 @@ Y = observations = (np.array(p) - mean_fn(X1, r.t2bv(np.array(te)), a, b, c, d))
 noise_variance = p_error
 
 gaussian_process_model = tfd.JointDistributionSequential([
+<<<<<<< HEAD
   tfd.LogNormal(np.float64(2.), np.float64(.001)),
   tfd.LogNormal(np.float64(2.5), np.float64(.001)),
   tfd.Normal(X1.reshape(-1), (np.array(age_error)/np.array(age)).reshape(-1)),
   tfd.Normal(X2.reshape(-1), 0.43*(np.array(tee)/np.array(te)).reshape(-1)),
   tfd.Normal(X3.reshape(-1), np.array(mass_error).reshape(-1)),
   lambda amplitude, length_scale, observations1_, observations2_, observations3_: tfd.GaussianProcess(
+=======
+  tfd.LogNormal(np.float64(0.), np.float64(0.001)),
+  tfd.LogNormal(np.float64(30.), np.float64(.01)),
+  tfd.LogNormal(X1.reshape(-1), 0.43*0.2*X1.reshape(-1)),
+  tfd.Normal(X2.reshape(-1), 0.04*X1.reshape(-1)),
+  tfd.Normal(X3.reshape(-1), 0.04*X1.reshape(-1)),
+  lambda length_scale, amplitude, observations1_, observations2_, observations3_: tfd.GaussianProcess(
+>>>>>>> parent of abde0d7 (minor fixes in statistics and hmc)
       kernel=psd_kernels.ExponentiatedQuadratic(amplitude, length_scale),
       index_points=observation_index_points, observation_noise_variance=noise_variance)])
 
@@ -238,7 +247,11 @@ plt.xlabel('Age (Gyr)', fontdict=font)
 plt.ylabel('Rotation (Days)', fontdict=font)
 plt.legend(fontsize='xx-large')
 
+<<<<<<< HEAD
 Z = (np.sort(data[::,1])-vals[0,:])/vals[1,:]**2
+=======
+Z = (np.sort(data[::al,1])-vals[0,:])/vals[1,:]**0.01
+>>>>>>> parent of abde0d7 (minor fixes in statistics and hmc)
 print(Y.shape)
 plt.figure(figsize=(9,8))
 plt.hist(Z, density=True, bins=20)
