@@ -78,7 +78,11 @@ plt.show()
 
 data_r = []
 for num in range(0, len(data0)):
+<<<<<<< HEAD
   if np.random.random_sample()< 0.4:
+=======
+  if np.random.random_sample()< 0.1:
+>>>>>>> parent of a76ed96 (latent - B-V and mass)
     data_r.append(data0[num])
 data_r = np.array(data_r)
 print(len(data_r))
@@ -134,6 +138,7 @@ gaussian_process_model = tfd.JointDistributionSequential([
   lambda amplitude, length_scale, observations1_, observations2_, observations3_: tfd.GaussianProcess(
 =======
   tfd.LogNormal(np.float64(0.), np.float64(0.001)),
+<<<<<<< HEAD
   tfd.LogNormal(np.float64(30.), np.float64(.01)),
   tfd.LogNormal(X1.reshape(-1), 0.43*0.2*X1.reshape(-1)),
   tfd.Normal(X2.reshape(-1), 0.04*X1.reshape(-1)),
@@ -149,9 +154,23 @@ initial_chain_states = [
     tf.convert_to_tensor(X1.reshape(-1), dtype=np.float64, name='observations1_'),
     tf.convert_to_tensor(X2.reshape(-1), dtype=np.float64, name='observations2_'),
     tf.convert_to_tensor(X3.reshape(-1), dtype=np.float64, name='observations3_')]
+=======
+  tfd.LogNormal(np.float64(30.), np.float64(5.)),
+  tfd.LogNormal(np.float64(1.), np.float64(1.)),
+  tfd.LogNormal(X1.reshape(-1), 0.2*X1.reshape(-1)),
+  lambda noise_variance, length_scale, amplitude, observations_: tfd.GaussianProcess(
+      kernel=psd_kernels.ExponentiatedQuadratic(amplitude, length_scale),
+      index_points=observation_index_points,
+      observation_noise_variance=noise_variance)])
+
+initial_chain_states = [
+    1e0 * tf.ones([len(X1)], dtype=np.float64, name='init_amplitude'),
+    30 * tf.ones([len(X1)], dtype=np.float64, name='init_length_scale'),
+    1e-2 * tf.ones([len(X1)], dtype=np.float64, name='init_obs_noise_variance'),
+    tf.convert_to_tensor(X1.reshape(-1), dtype=np.float64, name='observations_')]
+>>>>>>> parent of a76ed96 (latent - B-V and mass)
 
 unconstraining_bijectors = [
-    tfp.bijectors.Softplus(),
     tfp.bijectors.Softplus(),
     tfp.bijectors.Softplus(),
     tfp.bijectors.Softplus(),
@@ -166,8 +185,13 @@ num_burnin_steps = 10000
 def run_mcmc():
   return tfp.mcmc.sample_chain(
       num_results=num_results,
+<<<<<<< HEAD
       num_burnin_steps=num_burnin_steps,
       num_steps_between_results=10,
+=======
+      num_burnin_steps=50,
+      num_steps_between_results=3,
+>>>>>>> parent of a76ed96 (latent - B-V and mass)
       current_state=initial_chain_states,
       kernel=tfp.mcmc.SimpleStepSizeAdaptation(
           inner_kernel = tfp.mcmc.HamiltonianMonteCarlo(
@@ -179,21 +203,30 @@ def run_mcmc():
 [
       amplitudes,
       length_scales,
-      observations1_,
-      observations2_, observations3_
+      observation_noise_variances,
+      observations_
 ], is_accepted = run_mcmc()
 
 
 print("Acceptance rate: {}".format(np.mean(is_accepted)))
+<<<<<<< HEAD
 observation_index_points = np.dstack([observations1_.numpy()[0], observations2_.numpy()[0], observations3_.numpy()[0]]).reshape(-1,3)
 Y = observations = np.array(p) - mean_fn(observation_index_points[:,0], r.t2bv(10**(observation_index_points[:,1])), a, b, c, d)
+=======
+print(observations_.numpy()[0])
+observation_index_points = np.dstack([observations_.numpy()[0], X2, X3]).reshape(-1, 3)
+>>>>>>> parent of a76ed96 (latent - B-V and mass)
 
 gp = tfd.GaussianProcessRegressionModel(
     kernel=psd_kernels.ExponentiatedQuadratic(np.mean(amplitudes), np.mean(length_scales)),
     index_points=X_test,
     observation_index_points=observation_index_points,
     observations= observations,
+<<<<<<< HEAD
     observation_noise_variance=noise_variance)
+=======
+    observation_noise_variance=np.mean(observation_noise_variances))
+>>>>>>> parent of a76ed96 (latent - B-V and mass)
 
 #print("Final NLL = {}".format(neg_log_likelihood_))
 
@@ -204,13 +237,16 @@ var = np.array(gp.variance())
 t2 = time.perf_counter()
 print()
 
+(observations_.numpy()[0] - X1)
+
 acf = tfp.stats.auto_correlation(
     amplitudes, axis=-1, max_lags=None, center=True, normalize=True,
     name='auto_correlation'
 )
 
 var1 = np.array([amplitudes,
-      length_scales])
+      length_scales,
+      observation_noise_variances])
 az.plot_autocorr(var1)
 '''
 , var_names=("amplitudes",
@@ -232,10 +268,17 @@ print(np.mean(Y))
 font = {'size': 16,
         }
 plt.figure(figsize=(18,9))
+<<<<<<< HEAD
 plt.errorbar(np.sort(data[::, 1]), vals[0,:], yerr=vals[1,:]**0.5, fmt='bo')
 plt.fill_between(np.sort(data[::, 1]), vals[0,:] - vals[1,:]**0.5, vals[0,:] + vals[1,:]**0.5, color='blue', alpha=0.2)
 plt.scatter(np.sort(data[::, 1]), np.sort(mu_test))
 x = np.linspace(0, 50)
+=======
+#plt.errorbar(np.sort(data[::al, 1]), vals[0,:], yerr=vals[1,:]**0.5, fmt='bo')
+plt.fill_between(np.sort(data[::al, 1]), vals[0,:] - 20*vals[1,:]**0.5, vals[0,:] + 20*vals[1,:]**0.5, color='blue', alpha=0.2)
+plt.scatter(np.sort(data[::al, 1]), np.sort(mu_test))
+x = np.linspace(0, 40)
+>>>>>>> parent of a76ed96 (latent - B-V and mass)
 plt.plot(x, x , 'r')
 plt.xlabel('Data', fontdict=font)
 plt.ylabel('Prediction', fontdict=font)
